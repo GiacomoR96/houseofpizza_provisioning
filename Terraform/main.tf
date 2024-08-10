@@ -86,7 +86,7 @@ resource "aws_s3_bucket" "jenkins-artifacts" {
 #Create EC2 Instance
 resource "aws_instance" "instance1" {
   ami                    = "ami-0a0e5d9c7acc336f1"
-  instance_type          = "t2.micro"
+  instance_type          = "t2.medium"
   vpc_security_group_ids = [aws_security_group.jenkins_sg.id]
   tags = {
     Name = "jenkins_instance"
@@ -95,12 +95,12 @@ resource "aws_instance" "instance1" {
   #Bootstrap Jenkins installation and start  
   user_data = <<-EOF
   #!/bin/bash
-  sudo yum update -y
-  sudo wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
-  sudo rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
-  sudo yum upgrade
-  sudo amazon-linux-extras install java-openjdk11 -y
-  sudo yum install jenkins -y
+  sudo apt-get update -y
+  sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
+  #echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
+  sudo apt-get update
+  sudo apt-get install jenkins -y
+  sudo apt-get install openjdk-11-jdk -y
   sudo systemctl enable jenkins
   sudo systemctl start jenkins
   EOF
