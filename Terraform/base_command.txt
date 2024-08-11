@@ -1,0 +1,23 @@
+
+# Base command for using terraform
+
+terraform init — downloads plugins needed to execute config files (does note modify or apply state or config files)
+
+terraform validate — validates if the file syntax is valid
+
+terraform plan — creates an execution plan, listing resources that will be created based on the Terraform file
+
+terraform apply — provisions/creates the resource infrastructure as defined in the Terraform file
+
+terraform destroy — deletes/removes all resources that were created with the terraform apply command
+
+terraform fmt — formats the spacing to correct HCL format
+
+
+# My command
+
+mkdir ssh_keys
+cd ssh_keys
+ssh-keygen -t rsa -b 4096
+chmod 400 key_pair
+ls -la key_pair

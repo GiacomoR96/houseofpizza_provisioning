@@ -81,29 +81,49 @@ resource "aws_s3_bucket" "jenkins-artifacts" {
 #  depends_on = [aws_s3_bucket_ownership_controls.s3_bucket_acl_ownership]
 #}
 
+resource "aws_key_pair" "key_pair" {
+  key_name   = var.KEY_NAME
+  public_key = file("ssh_key/key_pair.pub")
+}
 
 ## EC2 INSTANCE
 #Create EC2 Instance
 resource "aws_instance" "instance1" {
-  ami                    = "ami-0a0e5d9c7acc336f1"
-  instance_type          = "t2.medium"
-  vpc_security_group_ids = [aws_security_group.jenkins_sg.id]
+  ami                     = "ami-0a0e5d9c7acc336f1"
+  instance_type           = "t2.medium"
+  vpc_security_group_ids  = [aws_security_group.jenkins_sg.id]
+  #key_name               = file("labsuser.pem")
+  key_name                = var.KEY_NAME
   tags = {
     Name = "jenkins_instance"
   }
+  
+  #provisioner "local-exec" {
+  #  interpreter=["/bin/bash", "-c"]
+  #  command = "sudo apt-get update -y"
+  #}
 
-  #Bootstrap Jenkins installation and start  
-  user_data = <<-EOF
-  #!/bin/bash
-  sudo apt-get update -y
-  sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key
-  #echo "deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]" https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null
-  sudo apt-get update
-  sudo apt-get install jenkins -y
-  sudo apt-get install openjdk-11-jdk -y
-  sudo systemctl enable jenkins
-  sudo systemctl start jenkins
-  EOF
+  provisioner "remote-exec" {
+    # Establishes connection to be used by all
+    # generic remote provisioners (i.e. file/remote-exec)
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      private_key = file("ssh_key/key_pair")
+      host        = self.public_ip
+      timeout     = "5m"
+    }
+  
+    inline = [
+      "sudo apt-get update -y",
+      "sudo wget -O /usr/share/keyrings/jenkins-keyring.asc https://pkg.jenkins.io/debian-stable/jenkins.io-2023.key",
+      "echo 'deb [signed-by=/usr/share/keyrings/jenkins-keyring.asc]' https://pkg.jenkins.io/debian-stable binary/ | sudo tee /etc/apt/sources.list.d/jenkins.list > /dev/null",
+      "sudo apt-get update",
+      "sudo apt-get install jenkins -y",
+      "sudo apt-get install openjdk-11-jdk -y",
+      "sudo systemctl enable jenkins",
+      "sudo systemctl start jenkins"
+    ]
+  }
 
-  user_data_replace_on_change = true
 }
