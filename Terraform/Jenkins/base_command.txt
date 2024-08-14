@@ -21,3 +21,8 @@ cd ssh_keys
 ssh-keygen -t rsa -b 4096
 chmod 400 key_pair
 ls -la key_pair
+cd ..
+
+OR
+
+mkdir ssh_keys && cd ssh_keys && ssh-keygen -t rsa -b 4096 && chmod 400 key_pair && ls -la key_pair && cd ..

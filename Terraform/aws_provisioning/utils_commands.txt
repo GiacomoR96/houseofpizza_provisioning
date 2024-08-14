@@ -1,0 +1,19 @@
+# Utils command for aws credentials
+
+rm -rf credential_key
+mkdir -p credential_key
+cd credential_key
+cat ~/environment/aws_provisioning/config.txt | grep 'aws_access_key_id' | cut -d '=' -f 2 > aws_access_key
+cat ~/environment/aws_provisioning/config.txt | grep 'aws_secret_access_key' | cut -d '=' -f 2 > aws_secret_access_key
+cat ~/environment/aws_provisioning/config.txt | grep 'aws_session_token' | cut -d '=' -f 2 > aws_session_token
+cd ..
+
+OR
+rm -rf credential_key && mkdir -p credential_key && cd credential_key && cat ~/environment/aws_provisioning/config.txt | grep 'aws_access_key_id' | cut -d '=' -f 2 > aws_access_key_id && cat ~/environment/aws_provisioning/config.txt | grep 'aws_secret_access_key' | cut -d '=' -f 2 > aws_secret_access_key && cat ~/environment/aws_provisioning/config.txt | grep 'aws_session_token' | cut -d '=' -f 2 > aws_session_token && cd ..
+
+
+# Example command for setting environment varibles (ONLY Windows, using Powershell)
+
+$Env:AWS_ACCESS_KEY_ID="aws_access_key"
+$Env:AWS_SECRET_ACCESS_KEY="aws_secret_access_key"
+$Env:AWS_DEFAULT_REGION="aws_region"

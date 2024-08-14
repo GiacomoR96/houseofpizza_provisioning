@@ -1,1 +1,24 @@
-ssh_key/
+
+# Parent folder
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+
+# Jenkins
+Terraform/Jenkins/.terraform
+Terraform/Jenkins/terraform.tfstate
+Terraform/Jenkins/terraform.tfstate.backup
+Terraform/Jenkins/.terraform.tfstate.lock.info
+Terraform/Jenkins/ssh_keys/
+Terraform/Jenkins/.terraform.lock.hcl
+
+# AWS PROVISIONING
+Terraform/aws_provisioning/.terraform
+Terraform/aws_provisioning/terraform.tfstate
+Terraform/aws_provisioning/terraform.tfstate.backup
+Terraform/aws_provisioning/.terraform.tfstate.lock.info
+Terraform/aws_provisioning/ssh_keys/
+Terraform/aws_provisioning/.terraform.lock.hcl
+Terraform/aws_provisioning/credential_key/aws_access_key
+Terraform/aws_provisioning/credential_key/aws_secret_access_key
+Terraform/aws_provisioning/credential_key/aws_session_token

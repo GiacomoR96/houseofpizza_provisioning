@@ -83,7 +83,7 @@ resource "aws_s3_bucket" "jenkins-artifacts" {
 
 resource "aws_key_pair" "key_pair" {
   key_name   = var.KEY_NAME
-  public_key = file("ssh_key/key_pair.pub")
+  public_key = file("ssh_keys/key_pair.pub")
 }
 
 ## EC2 INSTANCE
@@ -109,7 +109,7 @@ resource "aws_instance" "instance1" {
     connection {
       type        = "ssh"
       user        = "ubuntu"
-      private_key = file("ssh_key/key_pair")
+      private_key = file("ssh_keys/key_pair")
       host        = self.public_ip
       timeout     = "5m"
     }
