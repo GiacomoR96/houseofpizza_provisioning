@@ -9,30 +9,13 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
   cluster_endpoint_public_access = true
 
-  /*cluster_addons = {
-    aws-ebs-csi-driver = {
-      service_account_role_arn = module.irsa-ebs-csi.iam_role_arn
-    }
-  }*/
-
   eks_managed_node_group_defaults = {
     ami_type = "AL2_x86_64"
-
   }
 
   eks_managed_node_groups = {
-    one = {
-      name = "node-group-1"
-
-      instance_types = ["t2.medium"]
-
-      min_size     = 1
-      max_size     = 3
-      desired_size = 2
-    }
-
-    two = {
-      name = "node-group-2"
+    master = {
+      name = "node-group-master"
 
       instance_types = ["t2.medium"]
 
@@ -40,22 +23,41 @@ module "eks" {
       max_size     = 2
       desired_size = 1
     }
+
+    worker = {
+      name = "node-group-worker"
+
+      instance_types = ["t2.medium"]
+
+      min_size     = 2
+      max_size     = 6
+      desired_size = 2
+    }
   }
 }
 
-/*
-# https://aws.amazon.com/blogs/containers/amazon-ebs-csi-driver-is-now-generally-available-in-amazon-eks-add-ons/ 
-data "aws_iam_policy" "ebs_csi_policy" {
-  arn = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
+resource "aws_eks_access_entry" "eks_access_entry" {
+  for_each       = { for entry in var.iam_access_entries : entry.principal_arn => entry }
+  cluster_name  = local.cluster_name
+  principal_arn = each.value.principal_arn
+  type          = "STANDARD"
+
+  depends_on = [
+    module.eks
+  ]
 }
 
-module "irsa-ebs-csi" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-assumable-role-with-oidc"
-  version = "5.39.0"
+resource "aws_eks_access_policy_association" "eks_policy_association" {
+  for_each       = { for entry in var.iam_access_entries : entry.principal_arn => entry }
+  cluster_name  = local.cluster_name
+  policy_arn    = each.value.policy_arn
+  principal_arn = each.value.principal_arn
 
-  create_role                   = true
-  role_name                     = "AmazonEKSTFEBSCSIRole-${module.eks.cluster_name}"
-  provider_url                  = module.eks.oidc_provider
-  role_policy_arns              = [data.aws_iam_policy.ebs_csi_policy.arn]
-  oidc_fully_qualified_subjects = ["system:serviceaccount:kube-system:ebs-csi-controller-sa"]
-}*/
+  access_scope {
+    type       = "cluster"
+  }
+
+  depends_on = [
+    aws_eks_access_entry.eks_access_entry
+  ]
+}

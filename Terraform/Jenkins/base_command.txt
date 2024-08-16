@@ -8,6 +8,7 @@ terraform validate — validates if the file syntax is valid
 terraform plan — creates an execution plan, listing resources that will be created based on the Terraform file
 
 terraform apply — provisions/creates the resource infrastructure as defined in the Terraform file
+terraform apply -auto-approve
 
 terraform destroy — deletes/removes all resources that were created with the terraform apply command
 

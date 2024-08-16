@@ -17,3 +17,8 @@ rm -rf credential_key && mkdir -p credential_key && cd credential_key && cat ~/e
 $Env:AWS_ACCESS_KEY_ID="aws_access_key"
 $Env:AWS_SECRET_ACCESS_KEY="aws_secret_access_key"
 $Env:AWS_DEFAULT_REGION="aws_region"
+
+# Example command aws for get information
+
+#Get info callerer-identity
+aws sts get-caller-identity
