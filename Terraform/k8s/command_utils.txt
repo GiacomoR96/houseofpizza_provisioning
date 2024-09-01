@@ -1,0 +1,15 @@
+# Problem with old instance profile created
+aws iam delete-instance-profile --instance-profile-name k8s-cluster-master
+aws iam delete-instance-profile --instance-profile-name k8s-cluster-worker
+
+
+# View log on machine
+tail -f /var/log/init-master.log | uniq -c
+less +G /var/log/init-master.log
+more -d /var/log/init-master.log
+
+
+# Folder path script uploaded from terraform.cloud_init 
+cd /var/lib/cloud/instance/scripts/
+
+chmod +x test2.sh

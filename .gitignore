@@ -17,8 +17,20 @@ Terraform/aws_provisioning/.terraform
 Terraform/aws_provisioning/terraform.tfstate
 Terraform/aws_provisioning/terraform.tfstate.backup
 Terraform/aws_provisioning/.terraform.tfstate.lock.info
-Terraform/aws_provisioning/ssh_keys/
 Terraform/aws_provisioning/.terraform.lock.hcl
+Terraform/aws_provisioning/ssh_keys/
 Terraform/aws_provisioning/credential_key/aws_access_key
 Terraform/aws_provisioning/credential_key/aws_secret_access_key
 Terraform/aws_provisioning/credential_key/aws_session_token
+
+# AWS K8S
+Terraform/k8s/.terraform
+Terraform/k8s/terraform.tfstate
+Terraform/k8s/terraform.tfstate.backup
+Terraform/k8s/.terraform.tfstate.lock.info
+Terraform/k8s/.terraform.lock.hcl
+Terraform/k8s/credential_key/aws_access_key
+Terraform/k8s/credential_key/aws_secret_access_key
+Terraform/k8s/credential_key/aws_session_token
+Terraform/k8s/.ssh/terraform.pem
+Terraform/k8s/.ssh/terraform.pub
