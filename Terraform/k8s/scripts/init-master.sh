@@ -32,8 +32,8 @@ FULL_HOSTNAME="$(curl -s http://169.254.169.254/latest/meta-data/hostname)"
 echo "Init step - Install AWS CLI client"
 
 curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-sudo apt install unzip -y
-unzip awscliv2.zip
+sudo apt install unzip -y 
+unzip awscliv2.zip > /dev/null
 sudo ./aws/install
 
 echo "Finish step - Install AWS CLI client"
@@ -50,51 +50,65 @@ do
   aws ec2 create-tags --resources $SUBNET --tags Key=kubernetes.io/cluster/$CLUSTER_NAME,Value=shared --region $AWS_REGION
 done
 
-echo "Finish step - install containerd"
+echo "Finish step - Tag subnets"
+
 
 ########################################
 ########################################
 # Install containerd
 ########################################
 ########################################
-echo "Init step - Install containerd"
 
+sudo swapoff -a
+
+# Enable kernel modules and configure sysctl
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+sudo tee /etc/sysctl.d/kubernetes.conf<<EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo tee /etc/modules-load.d/k8s.conf <<EOF
+overlay
+br_netfilter
+EOF
+
+sudo sysctl --system
+
+# Install container runtime
+
+
+# Add Docker's official GPG key:
 sudo apt-get update
-sudo apt-get install ca-certificates curl -y
+sudo apt-get install apt-transport-https ca-certificates curl gpg
 sudo install -m 0755 -d /etc/apt/keyrings
 sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
 sudo chmod a+r /etc/apt/keyrings/docker.asc
-
+ 
+# Add the repository to Apt sources:
 echo \
   "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
   $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt-get update
 
+
+# Install and configure containerd
 sudo apt-get install containerd.io
-
-# Forwarding IPv4 and letting iptables see bridged traffic
-cat << EOF | sudo tee /etc/modules-load.d/k8s.conf 
-overlay 
-br_netfilter 
-EOF
-
-sudo modprobe overlay
-sudo modprobe br_netfilter
-
-cat <<EOF | sudo tee /etc/sysctl.d/k8s.conf
-net.bridge.bridge-nf-call-iptables  = 1
-net.bridge.bridge-nf-call-ip6tables = 1
-net.ipv4.ip_forward                 = 1
-EOF
-
-# Apply sysctl params without reboot
-sudo sysctl --system
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
 
 sudo systemctl restart containerd
 sudo systemctl enable containerd
+systemctl status containerd
 
-echo "Finish step - Install containerd"
+# Enable IP Forwarding and apply changes
+sudo sh -c "echo 'net.ipv4.ip_forward = 1' >> /etc/sysctl.conf"
+sudo sysctl -p
+
 
 ########################################
 ########################################
@@ -117,15 +131,18 @@ echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.
 sudo apt-get update
 sudo apt-get install -y kubelet kubeadm
 sudo apt-mark hold kubelet kubeadm 
+sudo bash <<EOF
 kubeadm completion bash > /etc/bash_completion.d/kubeadm
+EOF
+
 #kubectl completion bash > /etc/bash_completion.d/kubectl
 
 curl -LO https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 
 # Start services
-systemctl enable kubelet
-systemctl start kubelet
+sudo systemctl enable kubelet
+sudo systemctl start kubelet
 
 echo "Finish step - Install Kubernetes components"
 
@@ -163,7 +180,34 @@ echo "First part - calico"
 kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.4/manifests/tigera-operator.yaml
 
 echo "Second part - calico"
-kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.4/manifests/custom-resources.yaml
+#kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.4/manifests/custom-resources.yaml
+
+cat >/home/ubuntu/custom-resources.yaml <<EOF
+---
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  # Configures Calico networking.
+  calicoNetwork:
+    ipPools:
+    - blockSize: 26
+      cidr: 10.0.0.0/16
+      encapsulation: VXLANCrossSubnet
+      natOutgoing: Enabled
+      nodeSelector: all()
+---
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}
+---
+EOF
+
+kubectl create -f /home/ubuntu/custom-resources.yaml
+
 echo "Finish - calico"
 
 #Flannel configuration
@@ -171,7 +215,7 @@ echo "Finish - calico"
 
 
 # Allow the user to administer the cluster
-kubectl create clusterrolebinding admin-cluster-binding --clusterrole=cluster-admin --user=admin
+#kubectl create clusterrolebinding admin-cluster-binding --clusterrole=cluster-admin --user=admin
 
 echo "Finish step - Configuration Kubernetes networking"
 

@@ -79,7 +79,7 @@ data "cloudinit_config" "master" {
 }
 
 resource "aws_instance" "master" {
-  ami                     = "ami-0a0e5d9c7acc336f1"
+  ami                     = "ami-0e86e20dae9224db8"
   instance_type           = "t2.medium"
   vpc_security_group_ids  = [aws_security_group.kubernetes.id]
   key_name                = aws_key_pair.keypair.key_name
@@ -145,7 +145,7 @@ data "cloudinit_config" "worker" {
 
 resource "aws_launch_template" "worker" {
   name = "${var.cluster_name}-worker"
-  image_id = "ami-0a0e5d9c7acc336f1"
+  image_id = "ami-0e86e20dae9224db8"
   instance_type           = "t2.medium"
   key_name                = aws_key_pair.keypair.key_name
   user_data = data.cloudinit_config.worker.rendered
