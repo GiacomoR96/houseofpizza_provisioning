@@ -174,6 +174,10 @@ cp /home/ubuntu/config-calico /etc/cni/net.d/10-calico.conflist
 chmod 600 /etc/cni/net.d/10-calico.conflist
 EOF
 
+#kubectl apply -f https://docs.projectcalico.org/manifests/calico.yaml  # It works, i.e., it allows the worker node to switch to the Ready state within the cluster, 
+                                                                        # but you have to wait until the service on port 6443 is active, and running it this way doesn't give you the time. I ran it from the command line after confirming that the service on port 6443 is active.
+                                                                        # Enter a sleep to allow the service to activate or find another way to make sure everything is active.
+
 kubectl get nodes
 
 echo "Finish - Calico Second part"
