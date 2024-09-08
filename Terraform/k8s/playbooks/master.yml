@@ -1,0 +1,16 @@
+# How to install Jenkins using Ansible Version 2018
+# https://awsbloglink.wordpress.com/2018/10/08/how-to-install-jenkins-using-ansible-version-2018/
+---
+- name: Configuration master
+  hosts: all
+  gather_facts: false
+  become: ubuntu
+  
+  tasks:
+    - name: Execute the Uptime command over Command module
+      register: uptimeoutput
+      command: "uptime"
+
+    - debug:
+        var: uptimeoutput.stdout_lines
+

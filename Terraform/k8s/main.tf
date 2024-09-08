@@ -92,8 +92,23 @@ resource "aws_instance" "master" {
     Name = "master-instance"
   }
 
-}
+  provisioner "remote-exec" {
+    # Establishes connection to be used by all
+    # generic remote provisioners (i.e. file/remote-exec)
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+      host        = self.public_ip
+      timeout     = "5m"
+    }
+  
+    inline = [
+      "sudo apt install python3 -y"
+    ]
+  }
 
+}
 
 #####
 # Worker configuration
@@ -187,3 +202,49 @@ resource "aws_autoscaling_group" "worker" {
     version = "$Latest"
   }
 }
+
+/* TODO: Use this configuration for master, worker and db
+>hosts.ini;
+	  [webserver]
+    ${aws_instance.master.public_ip}
+    ${aws_instance.worker[0].public_ip}
+    ${aws_instance.worker[1].public_ip}
+    [dbserve]
+    ${aws_instance.dbserver.public_ip}
+*/
+
+// Generate inventory file
+resource "local_file" "inventory" {
+ filename = "${path.module}/playbooks/hosts.ini"
+ content = <<EOF
+[global]
+master = "${aws_instance.master.public_ip}"
+ EOF
+
+  // TODO: Add here reference for worker in future
+  depends_on = [
+    aws_instance.master,
+  ]
+}
+
+// Ansible configuration for master node
+resource "null_resource" "ansible_provisioner_master" {
+  provisioner "local-exec" {
+    //command = "ansible-playbook --private-key ${path.module}/.ssh/terraform.pem -i ${file("${path.module}/playbooks/hosts.ini")}, master.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master.yml"
+    working_dir = "${path.module}/playbooks"
+  }
+
+  depends_on = [
+    local_file.inventory
+  ]
+}
+
+/*
+TODO : To improve ssh connection, use this with first tasks on all yml
+
+    - name: Write the new ec2 instance host key to known hosts
+      connection: local
+      shell: "ssh-keyscan -H {{ lookup('ini', 'master', file='hosts.ini') }} >> ~/.ssh/known_hosts"
+
+*/
