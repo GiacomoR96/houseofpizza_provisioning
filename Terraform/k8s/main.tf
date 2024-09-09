@@ -215,10 +215,20 @@ resource "aws_autoscaling_group" "worker" {
 
 // Generate inventory file
 resource "local_file" "inventory" {
- filename = "${path.module}/playbooks/hosts.ini"
+ filename = "${path.module}/playbooks/config_vars.yml"
  content = <<EOF
-[global]
-master = "${aws_instance.master.public_ip}"
+---
+# ./config_vars.yml
+
+master: "${aws_instance.master.public_ip}"
+kubeadm_token: "${templatefile("token/token-format.tpl", { token1 = join("", random_shuffle.token1.result), token2 = join("", random_shuffle.token2.result) } )}"
+ip_address: "${aws_eip.master.public_ip}"
+cluster_name: "${var.cluster_name}"
+aws_region: "${var.AWS_REGION}"
+aws_subnets: "${join(" ", concat("${aws_subnet.public_subnet.*.id}", ["${aws_subnet.public_subnet[0].id}"]))}"
+
+aws_access_key: "${file("credential_key/aws_access_key")}"
+aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
  EOF
 
   // TODO: Add here reference for worker in future

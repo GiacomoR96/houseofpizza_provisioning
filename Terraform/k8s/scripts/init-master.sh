@@ -22,18 +22,3 @@ set -o nounset
 # We needed to match the hostname expected by kubeadm an the hostname used by kubelet
 LOCAL_IP_ADDRESS=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 FULL_HOSTNAME="$(curl -s http://169.254.169.254/latest/meta-data/hostname)"
-
-
-########################################
-########################################
-# Install AWS CLI client
-########################################
-########################################
-echo "Init step - Install AWS CLI client"
-
-curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-sudo apt install unzip -y 
-unzip awscliv2.zip > /dev/null
-sudo ./aws/install
-
-echo "Finish step - Install AWS CLI client"

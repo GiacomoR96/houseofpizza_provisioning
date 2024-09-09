@@ -4,13 +4,99 @@
 - name: Configuration master
   hosts: all
   gather_facts: false
-  become: ubuntu
+  become: yes
   
   tasks:
+    - include_vars: config_vars.yml
+
+    - debug: msg="Hello, {{ master }}!"
+
+    - debug: msg="Hello kubeadm_token, {{ kubeadm_token }}!"
+
+    - debug: msg="Hello ip_address, {{ ip_address }}!"
+
+    - debug: msg="Hello cluster_name, {{ cluster_name }}!"
+
+    - debug: msg="Hello aws_region, {{ aws_region }}!"
+
+    - debug: msg="Hello aws_subnets, {{ aws_subnets }}!"
+
+    - debug: msg="Hello aws_subnets, {{ aws_access_key }}!"
+
+    - debug: msg="Hello aws_subnets, {{ aws_secret_access_key }}!"
+
+    - name: Creates directory aws credential
+      ansible.builtin.file:
+        path: /home/ubuntu/.aws
+        state: directory
+  
+    - name: Add aws_access_key file
+      copy:
+        dest: "/home/ubuntu/.aws/aws_access_key"
+        content: |
+          {{ aws_access_key }}
+  
+    - name: Add aws_secret_access_key file
+      copy:
+        dest: "/home/ubuntu/.aws/aws_secret_access_key"
+        content: |
+          {{ aws_secret_access_key }}
+
     - name: Execute the Uptime command over Command module
       register: uptimeoutput
       command: "uptime"
 
     - debug:
         var: uptimeoutput.stdout_lines
+  
+    - name: Install AWS CLI client
+      block:
+        - name: Download AWS CLI
+          shell: "curl -o awscliv2.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        
+        - name: Install unzip
+          apt:
+            name: unzip
+            state: present
+        
+        - name: Extract AWS CLI
+          shell: "unzip awscliv2.zip > /dev/null"
+        
+        - name: Run AWS CLI installer
+          shell: "sudo ./aws/install"
+      tags: 
+        - aws_cli
+  
+    - name: Tag subnets
+      block:
+        - name: Tag subnets
+          shell: "for SUBNET in {{ aws_subnets }}; do aws ec2 create-tags --resources $SUBNET --tags Key=kubernetes.io/cluster/{{ cluster_name }},Value=shared --region {{ aws_region }}; done"
+      tags:
+        - tag_subnets
+
+    - name: Install Containerd
+      block:
+        - name: Disable swap
+          command: "swapoff -a"
+        
+        - name: Configure kernel modules and sysctl
+          command: "modprobe overlay && modprobe br_netfilter"
+        
+        - name: Configure sysctl
+          copy:
+            dest: "/etc/sysctl.d/kubernetes.conf"
+            content: |
+              net.bridge.bridge-nf-call-ip6tables = 1
+              net.bridge.bridge-nf-call-iptables = 1
+              net.ipv4.ip_forward = 1
+        
+        - name: Configure modules load
+          copy:
+            dest: "/etc/modules-load.d/k8s.conf"
+            content: |
+              overlay
+              br_netfilter
+        
+        - name: Apply sysctl settings
+          command: "sysctl --system"
 
