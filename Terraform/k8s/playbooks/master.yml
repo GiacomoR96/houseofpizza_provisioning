@@ -182,3 +182,94 @@
         value: '1'
         state: present
         reload: yes
+
+    
+    ########################################
+    # Install Kubernetes components
+    ########################################
+
+    # Add Kubernetes GPG key
+    - name: Download Kubernetes GPG key
+      get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key
+        dest: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+        mode: '0644'
+
+    # Add Kubernetes repository to apt sources
+    - name: Add Kubernetes repository
+      copy:
+        content: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /'
+        dest: /etc/apt/sources.list.d/kubernetes.list
+        mode: '0644'
+
+    # Update apt cache after adding Kubernetes repo
+    - name: Update apt cache after adding Kubernetes repo
+      apt:
+        update_cache: yes
+
+    # Install Kubernetes components
+    - name: Install kubelet and kubeadm
+      apt:
+        name:
+          - kubelet
+          - kubeadm
+        state: present
+
+    # Enable bash completion for kubeadm
+    - name: Enable bash completion for kubeadm
+      shell: |
+        kubeadm completion bash > /etc/bash_completion.d/kubeadm
+      args:
+        creates: /etc/bash_completion.d/kubeadm
+
+    # Install kubectl manually
+    - name: Download kubectl
+      get_url:
+        url: https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+
+    # Enable and start kubelet service
+    - name: Enable and start kubelet
+      systemd:
+        name: kubelet
+        enabled: yes
+        state: started
+
+    ########################################
+    # Initialize Kubernetes Cluster
+    ########################################
+
+    - name: Remove containerd config for Kubernetes
+      file:
+        path: /etc/containerd/config.toml
+        state: absent
+
+    - name: Restart containerd after config reset
+      systemd:
+        name: containerd
+        state: restarted
+
+    - name: Reset kubeadm cluster
+      command: kubeadm reset --force
+
+    - name: Initialize Kubernetes cluster
+      command: kubeadm init
+
+    # Setup kubeconfig for ubuntu user
+    - name: Create .kube directory
+      file:
+        path: /home/ubuntu/.kube
+        state: directory
+        owner: ubuntu
+        group: ubuntu
+        mode: '0700'
+
+    - name: Copy kubeconfig to user directory
+      copy:
+        src: /etc/kubernetes/admin.conf
+        dest: /home/ubuntu/.kube/config
+        remote_src: yes
+        owner: ubuntu
+        group: ubuntu
+        mode: '0600'
