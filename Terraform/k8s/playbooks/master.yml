@@ -100,3 +100,85 @@
         - name: Apply sysctl settings
           command: "sysctl --system"
 
+    # Update apt cache
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    # Install required packages
+    - name: Install required packages for Docker
+      apt:
+        name:
+          - apt-transport-https
+          - ca-certificates
+          - curl
+          - gpg
+        state: present
+
+    # Create Docker keyring directory
+    - name: Create Docker keyring directory
+      file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    # Add Docker GPG key
+    - name: Download Docker GPG key
+      get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+     # Get system architecture
+    - name: Get system architecture
+      command: dpkg --print-architecture
+      register: architecture
+
+    # Get OS codename
+    - name: Get OS codename
+      command: bash -c 'source /etc/os-release && echo $VERSION_CODENAME'
+      register: codename
+
+    # Add Docker repository to apt sources list
+    - name: Add Docker repository to APT sources
+      copy:
+        content: "deb [arch={{ architecture.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ codename.stdout }} stable"
+        dest: /etc/apt/sources.list.d/docker.list
+        mode: '0644'
+
+    # Update apt cache again
+    - name: Update apt cache after adding Docker repo
+      apt:
+        update_cache: yes
+
+    # Install containerd
+    - name: Install containerd
+      apt:
+        name: containerd.io
+        state: present
+
+    # Create containerd config directory
+    - name: Create containerd config directory
+      file:
+        path: /etc/containerd
+        state: directory
+
+    # Configure containerd
+    - name: Generate containerd config
+      shell: |
+        containerd config default | tee /etc/containerd/config.toml
+
+    # Restart and enable containerd service
+    - name: Restart and enable containerd
+      systemd:
+        name: containerd
+        enabled: yes
+        state: restarted
+
+    # Enable IP forwarding
+    - name: Enable IP forwarding
+      sysctl:
+        name: net.ipv4.ip_forward
+        value: '1'
+        state: present
+        reload: yes
