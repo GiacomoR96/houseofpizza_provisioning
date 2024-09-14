@@ -227,6 +227,10 @@ cluster_name: "${var.cluster_name}"
 aws_region: "${var.AWS_REGION}"
 aws_subnets: "${join(" ", concat("${aws_subnet.public_subnet.*.id}", ["${aws_subnet.public_subnet[0].id}"]))}"
 
+k8s_url_apt_key: "https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key"
+k8s_gpgpath: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+k8s_repository: "https://pkgs.k8s.io/core:/stable:/v1.31/deb/"
+
 aws_access_key: "${file("credential_key/aws_access_key")}"
 aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
  EOF

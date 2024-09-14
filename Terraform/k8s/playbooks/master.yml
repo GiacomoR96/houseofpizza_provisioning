@@ -9,21 +9,23 @@
   tasks:
     - include_vars: config_vars.yml
 
-    - debug: msg="Hello, {{ master }}!"
+    - debug: msg="Init configuration for master node"
 
-    - debug: msg="Hello kubeadm_token, {{ kubeadm_token }}!"
+    - debug: msg="Master config - IP, {{ master }}"
 
-    - debug: msg="Hello ip_address, {{ ip_address }}!"
+    - debug: msg="Master config - kubeadm_token, {{ kubeadm_token }}"
 
-    - debug: msg="Hello cluster_name, {{ cluster_name }}!"
+    - debug: msg="Master config - ip_address, {{ ip_address }}"
 
-    - debug: msg="Hello aws_region, {{ aws_region }}!"
+    - debug: msg="Master config - cluster_name, {{ cluster_name }}"
 
-    - debug: msg="Hello aws_subnets, {{ aws_subnets }}!"
+    - debug: msg="Master config - aws_region, {{ aws_region }}"
 
-    - debug: msg="Hello aws_subnets, {{ aws_access_key }}!"
+    - debug: msg="Master config - aws_subnets, {{ aws_subnets }}"
 
-    - debug: msg="Hello aws_subnets, {{ aws_secret_access_key }}!"
+    - debug: msg="Master config - aws_subnets, {{ aws_access_key }}"
+
+    - debug: msg="Master config - aws_subnets, {{ aws_secret_access_key }}"
 
     - name: Creates directory aws credential
       ansible.builtin.file:
@@ -183,24 +185,19 @@
         state: present
         reload: yes
 
-    
     ########################################
     # Install Kubernetes components
     ########################################
 
-    # Add Kubernetes GPG key
-    - name: Download Kubernetes GPG key
-      get_url:
-        url: https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key
-        dest: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-        mode: '0644'
+    - name: Get Kubernetes package key
+      shell: curl -fsSL {{ k8s_url_apt_key }} | gpg --dearmor -o {{ k8s_gpgpath }}
+      args:
+        creates: "{{ k8s_gpgpath }}"
 
-    # Add Kubernetes repository to apt sources
     - name: Add Kubernetes repository
-      copy:
-        content: 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /'
-        dest: /etc/apt/sources.list.d/kubernetes.list
-        mode: '0644'
+      apt_repository:
+        filename: kubernetes
+        repo: "deb [signed-by={{ k8s_gpgpath }}] {{ k8s_repository }} /"
 
     # Update apt cache after adding Kubernetes repo
     - name: Update apt cache after adding Kubernetes repo
@@ -273,3 +270,5 @@
         owner: ubuntu
         group: ubuntu
         mode: '0600'
+
+    - debug: msg="Init configuration for master node"
