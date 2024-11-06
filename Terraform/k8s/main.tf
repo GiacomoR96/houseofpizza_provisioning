@@ -192,9 +192,9 @@ resource "aws_launch_template" "worker" {
 }
 
 resource "aws_autoscaling_group" "worker" {
-  desired_capacity   = 1
+  desired_capacity   = 0
   max_size           = 4
-  min_size           = 1
+  min_size           = 0
   vpc_zone_identifier = [aws_subnet.public_subnet[0].id]
 
   launch_template {
@@ -241,6 +241,27 @@ aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
   ]
 }
 
+resource "null_resource" "master_transfer_folder" {
+
+  provisioner "file" {
+    source      = "${path.module}/networking"
+    destination = "/home/ubuntu/networking"
+
+    connection {
+      type        = "ssh"
+      host        = aws_instance.master.public_ip
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    local_file.inventory
+  ]
+
+}
+
+
 // Ansible configuration for master node
 resource "null_resource" "ansible_provisioner_master" {
   provisioner "local-exec" {
@@ -250,7 +271,7 @@ resource "null_resource" "ansible_provisioner_master" {
   }
 
   depends_on = [
-    local_file.inventory
+    null_resource.master_transfer_folder
   ]
 }
 
@@ -262,3 +283,25 @@ TODO : To improve ssh connection, use this with first tasks on all yml
       shell: "ssh-keyscan -H {{ lookup('ini', 'master', file='hosts.ini') }} >> ~/.ssh/known_hosts"
 
 */
+/*
+resource "null_resource" "wait_before_calico" {
+  provisioner "local-exec" {
+    command = "sleep 30"
+  }
+
+  depends_on = [
+    null_resource.ansible_provisioner_master
+  ]
+}
+
+
+resource "null_resource" "ansible_provisioner_master_calico" {
+  provisioner "local-exec" {
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master-calico.yml"
+    working_dir = "${path.module}/playbooks"
+  }
+
+  depends_on = [
+    null_resource.wait_before_calico
+  ]
+}*/

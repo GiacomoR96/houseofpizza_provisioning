@@ -1,5 +1,3 @@
-# How to install Jenkins using Ansible Version 2018
-# https://awsbloglink.wordpress.com/2018/10/08/how-to-install-jenkins-using-ansible-version-2018/
 ---
 - name: Configuration master
   hosts: all
@@ -125,11 +123,10 @@
         mode: '0755'
 
     # Add Docker GPG key
-    - name: Download Docker GPG key
-      get_url:
-        url: https://download.docker.com/linux/ubuntu/gpg
-        dest: /etc/apt/keyrings/docker.asc
-        mode: '0644'
+    - name: Download Docker GPG key using curl
+      command: curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
 
      # Get system architecture
     - name: Get system architecture
@@ -206,11 +203,7 @@
 
     # Install Kubernetes components
     - name: Install kubelet and kubeadm
-      apt:
-        name:
-          - kubelet
-          - kubeadm
-        state: present
+      shell: sudo apt-get install -y kubelet kubeadm kubectl
 
     # Enable bash completion for kubeadm
     - name: Enable bash completion for kubeadm
@@ -218,13 +211,6 @@
         kubeadm completion bash > /etc/bash_completion.d/kubeadm
       args:
         creates: /etc/bash_completion.d/kubeadm
-
-    # Install kubectl manually
-    - name: Download kubectl
-      get_url:
-        url: https://dl.k8s.io/release/v1.31.0/bin/linux/amd64/kubectl
-        dest: /usr/local/bin/kubectl
-        mode: '0755'
 
     # Enable and start kubelet service
     - name: Enable and start kubelet
@@ -271,4 +257,105 @@
         group: ubuntu
         mode: '0600'
 
-    - debug: msg="Init configuration for master node"
+    - debug: msg="End configuration for master node"
+    
+    ########################################
+    # Calico
+    ########################################
+    # Momentary problem on connection via Calico 
+
+    - name: Check Kubernetes API connectivity
+      command: kubectl get nodes --kubeconfig=/home/ubuntu/.kube/config
+      register: kubectl_test
+      retries: 5
+      delay: 5
+      until: kubectl_test.rc == 0
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        enabled: yes
+
+    - name: Sleep for Calico
+      shell: sleep 20
+
+    - name: Check 2 Kubernetes API connectivity
+      command: kubectl get nodes --kubeconfig=/home/ubuntu/.kube/config
+      register: kubectl_test
+      retries: 5
+      delay: 5
+      until: kubectl_test.rc == 0
+
+    - name: Install Calico dependencies
+      command: kubectl create -f /home/ubuntu/networking/tigera-operator.yaml --validate=false
+
+    - name: Apply custom Calico resources
+      command: kubectl create -f /home/ubuntu/networking/custom-resources.yaml  --validate=false
+
+    - name: Create a key for the CNI plugin
+      command: >
+        openssl req -newkey rsa:4096
+        -keyout /home/ubuntu/cni.key
+        -nodes
+        -out /home/ubuntu/cni.csr
+        -subj /CN=calico-cni
+      args:
+        chdir: /home/ubuntu
+
+    - name: Sign with certificate using the main Kubernetes CA
+      command: >
+        openssl x509 -req -in /home/ubuntu/cni.csr
+        -CA /etc/kubernetes/pki/ca.crt
+        -CAkey /etc/kubernetes/pki/ca.key
+        -CAcreateserial
+        -out /home/ubuntu/cni.crt
+        -days 365
+      args:
+        creates: /home/ubuntu/cni.crt
+
+    - name: Set the correct permissions for cni.crt
+      command: >
+        chown 1000:1000 /home/ubuntu/cni.crt
+
+    - name: Create a kubeconfig file for the CNI plugin to use to access Kubernetes
+      command: kubectl config view -o jsonpath='{.clusters[0].cluster.server}'
+      register: apiserver
+
+    - name: Config kubeconfig cluster
+      command: >
+        kubectl config set-cluster kubernetes
+        --certificate-authority=/etc/kubernetes/pki/ca.crt
+        --embed-certs=true
+        --server={{ apiserver.stdout }}
+        --kubeconfig=/home/ubuntu/cni.kubeconfig
+      args:
+        chdir: /home/ubuntu
+
+    - name: Config kubeconfig credential
+      command: >
+        kubectl config set-credentials calico-cni
+        --client-certificate=/home/ubuntu/cni.crt
+        --client-key=/home/ubuntu/cni.key
+        --embed-certs=true
+        --kubeconfig=/home/ubuntu/cni.kubeconfig
+      args:
+        chdir: /home/ubuntu
+
+    - name: Config kubeconfig default context
+      command: >
+        kubectl config set-context default
+        --cluster=kubernetes
+        --user=calico-cni
+        --kubeconfig=/home/ubuntu/cni.kubeconfig
+      args:
+        chdir: /home/ubuntu
+
+    - name: Use previous context for kubectl
+      command: kubectl config use-context default --kubeconfig=/home/ubuntu/cni.kubeconfig
+
+    - name: Define a cluster role the CNI plugin will use to access Kubernetes.
+      shell: "kubectl apply -f /home/ubuntu/networking/cluster-role.yaml"
+
+    - name: Define cluster-role-binding
+      shell: "kubectl create clusterrolebinding calico-cni --clusterrole=calico-cni --user=calico-cni"
