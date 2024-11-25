@@ -157,7 +157,7 @@ data "cloudinit_config" "worker" {
     random_shuffle.token2,
   ]
 }
-
+/*
 resource "aws_launch_template" "worker" {
   name = "${var.cluster_name}-worker"
   image_id = "ami-0e86e20dae9224db8"
@@ -202,6 +202,25 @@ resource "aws_autoscaling_group" "worker" {
     version = "$Latest"
   }
 }
+*/
+
+resource "aws_instance" "worker" {
+  count = 1  # Change this for using multiple instances of worker.
+
+  ami                    = "ami-0e86e20dae9224db8"
+  instance_type          = "t2.medium"
+  key_name               = aws_key_pair.keypair.key_name
+  subnet_id              = aws_subnet.public_subnet[0].id
+  iam_instance_profile   = aws_iam_instance_profile.worker_profile.name
+  user_data              = data.cloudinit_config.worker.rendered
+  associate_public_ip_address = true
+  vpc_security_group_ids  = [aws_security_group.kubernetes.id]
+
+  tags = {
+    Name = "${var.cluster_name}-worker-${count.index}"
+  }
+}
+
 
 /* TODO: Use this configuration for master, worker and db
 >hosts.ini;
@@ -241,15 +260,15 @@ aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
   ]
 }
 
-resource "null_resource" "master_transfer_folder" {
+resource "null_resource" "worker_transfer_folder" {
 
   provisioner "file" {
-    source      = "${path.module}/networking"
-    destination = "/home/ubuntu/networking"
+    source      = "${path.module}/.ssh"
+    destination = "/home/ubuntu/ssh_keys"
 
     connection {
       type        = "ssh"
-      host        = aws_instance.master.public_ip
+      host        = aws_instance.worker[0].public_ip
       user        = "ubuntu"
       private_key = file(".ssh/terraform.pem")
     }
@@ -261,7 +280,6 @@ resource "null_resource" "master_transfer_folder" {
 
 }
 
-
 // Ansible configuration for master node
 resource "null_resource" "ansible_provisioner_master" {
   provisioner "local-exec" {
@@ -271,8 +289,21 @@ resource "null_resource" "ansible_provisioner_master" {
   }
 
   depends_on = [
-    null_resource.master_transfer_folder
+    null_resource.worker_transfer_folder
   ]
+
+}
+
+resource "null_resource" "ansible_provisioner_worker" {
+  provisioner "local-exec" {
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.worker[0].public_ip}, worker.yml"
+    working_dir = "${path.module}/playbooks"
+  }
+
+  depends_on = [
+    null_resource.ansible_provisioner_master
+  ]
+
 }
 
 /*
@@ -283,25 +314,3 @@ TODO : To improve ssh connection, use this with first tasks on all yml
       shell: "ssh-keyscan -H {{ lookup('ini', 'master', file='hosts.ini') }} >> ~/.ssh/known_hosts"
 
 */
-/*
-resource "null_resource" "wait_before_calico" {
-  provisioner "local-exec" {
-    command = "sleep 30"
-  }
-
-  depends_on = [
-    null_resource.ansible_provisioner_master
-  ]
-}
-
-
-resource "null_resource" "ansible_provisioner_master_calico" {
-  provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master-calico.yml"
-    working_dir = "${path.module}/playbooks"
-  }
-
-  depends_on = [
-    null_resource.wait_before_calico
-  ]
-}*/

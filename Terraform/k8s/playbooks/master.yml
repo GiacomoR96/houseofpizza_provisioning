@@ -73,289 +73,60 @@
           shell: "for SUBNET in {{ aws_subnets }}; do aws ec2 create-tags --resources $SUBNET --tags Key=kubernetes.io/cluster/{{ cluster_name }},Value=shared --region {{ aws_region }}; done"
       tags:
         - tag_subnets
+  
+    - name: Disable UFW firewall
+      ufw:
+        state: disabled
 
-    - name: Install Containerd
-      block:
-        - name: Disable swap
-          command: "swapoff -a"
-        
-        - name: Configure kernel modules and sysctl
-          command: "modprobe overlay && modprobe br_netfilter"
-        
-        - name: Configure sysctl
-          copy:
-            dest: "/etc/sysctl.d/kubernetes.conf"
-            content: |
-              net.bridge.bridge-nf-call-ip6tables = 1
-              net.bridge.bridge-nf-call-iptables = 1
-              net.ipv4.ip_forward = 1
-        
-        - name: Configure modules load
-          copy:
-            dest: "/etc/modules-load.d/k8s.conf"
-            content: |
-              overlay
-              br_netfilter
-        
-        - name: Apply sysctl settings
-          command: "sysctl --system"
+    - name: Allow API server port (6443/tcp)
+      ufw:
+        rule: allow
+        port: 6443
+        proto: tcp
 
-    # Update apt cache
-    - name: Update apt cache
-      apt:
-        update_cache: yes
+    - name: Allow pods network (10.42.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.42.0.0/16'
+        to: 'any'
 
-    # Install required packages
-    - name: Install required packages for Docker
-      apt:
-        name:
-          - apt-transport-https
-          - ca-certificates
-          - curl
-          - gpg
-        state: present
+    - name: Allow services network (10.43.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.43.0.0/16'
+        to: 'any'
 
-    # Create Docker keyring directory
-    - name: Create Docker keyring directory
-      file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: '0755'
-
-    # Add Docker GPG key
-    - name: Download Docker GPG key using curl
-      command: curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    - name: Install K3S using curl (master node)
+      shell: curl -sfL https://get.k3s.io | sh -
       args:
-        creates: /etc/apt/keyrings/docker.asc
+        creates: /usr/local/bin/k3s
 
-     # Get system architecture
-    - name: Get system architecture
-      command: dpkg --print-architecture
-      register: architecture
+    - name: Set KUBECONFIG environment variable
+      lineinfile:
+        path: /etc/profile
+        line: 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml'
 
-    # Get OS codename
-    - name: Get OS codename
-      command: bash -c 'source /etc/os-release && echo $VERSION_CODENAME'
-      register: codename
+    - name: Save K3S token to /home/ubuntu/token_worker
+      shell: cat /var/lib/rancher/k3s/server/node-token > /home/ubuntu/token_worker
+      register: token_output
 
-    # Add Docker repository to apt sources list
-    - name: Add Docker repository to APT sources
-      copy:
-        content: "deb [arch={{ architecture.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ codename.stdout }} stable"
-        dest: /etc/apt/sources.list.d/docker.list
+    - name: Set the correct owner and permissions for token file
+      ansible.builtin.file:
+        path: /home/ubuntu/token_worker
+        owner: ubuntu
         mode: '0644'
 
-    # Update apt cache again
-    - name: Update apt cache after adding Docker repo
-      apt:
-        update_cache: yes
+    - name: Check if exists the keys.
+      stat:
+        path: /home/ubuntu/token_worker
+      register: token_file_status
 
-    # Install containerd
-    - name: Install containerd
-      apt:
-        name: containerd.io
-        state: present
+    - name: Debug file status
+      debug:
+        var: token_file_status
 
-    # Create containerd config directory
-    - name: Create containerd config directory
-      file:
-        path: /etc/containerd
-        state: directory
+    - name: Fail if token does not exist
+      fail:
+        msg: "Il file /home/ubuntu/token_worker non esiste!"
+      when: token_file_status.stat.exists == false
 
-    # Configure containerd
-    - name: Generate containerd config
-      shell: |
-        containerd config default | tee /etc/containerd/config.toml
-
-    # Restart and enable containerd service
-    - name: Restart and enable containerd
-      systemd:
-        name: containerd
-        enabled: yes
-        state: restarted
-
-    # Enable IP forwarding
-    - name: Enable IP forwarding
-      sysctl:
-        name: net.ipv4.ip_forward
-        value: '1'
-        state: present
-        reload: yes
-
-    ########################################
-    # Install Kubernetes components
-    ########################################
-
-    - name: Get Kubernetes package key
-      shell: curl -fsSL {{ k8s_url_apt_key }} | gpg --dearmor -o {{ k8s_gpgpath }}
-      args:
-        creates: "{{ k8s_gpgpath }}"
-
-    - name: Add Kubernetes repository
-      apt_repository:
-        filename: kubernetes
-        repo: "deb [signed-by={{ k8s_gpgpath }}] {{ k8s_repository }} /"
-
-    # Update apt cache after adding Kubernetes repo
-    - name: Update apt cache after adding Kubernetes repo
-      apt:
-        update_cache: yes
-
-    # Install Kubernetes components
-    - name: Install kubelet and kubeadm
-      shell: sudo apt-get install -y kubelet kubeadm kubectl
-
-    # Enable bash completion for kubeadm
-    - name: Enable bash completion for kubeadm
-      shell: |
-        kubeadm completion bash > /etc/bash_completion.d/kubeadm
-      args:
-        creates: /etc/bash_completion.d/kubeadm
-
-    # Enable and start kubelet service
-    - name: Enable and start kubelet
-      systemd:
-        name: kubelet
-        enabled: yes
-        state: started
-
-    ########################################
-    # Initialize Kubernetes Cluster
-    ########################################
-
-    - name: Remove containerd config for Kubernetes
-      file:
-        path: /etc/containerd/config.toml
-        state: absent
-
-    - name: Restart containerd after config reset
-      systemd:
-        name: containerd
-        state: restarted
-
-    - name: Reset kubeadm cluster
-      command: kubeadm reset --force
-
-    - name: Initialize Kubernetes cluster
-      command: kubeadm init
-
-    # Setup kubeconfig for ubuntu user
-    - name: Create .kube directory
-      file:
-        path: /home/ubuntu/.kube
-        state: directory
-        owner: ubuntu
-        group: ubuntu
-        mode: '0700'
-
-    - name: Copy kubeconfig to user directory
-      copy:
-        src: /etc/kubernetes/admin.conf
-        dest: /home/ubuntu/.kube/config
-        remote_src: yes
-        owner: ubuntu
-        group: ubuntu
-        mode: '0600'
-
-    - debug: msg="End configuration for master node"
-    
-    ########################################
-    # Calico
-    ########################################
-    # Momentary problem on connection via Calico 
-
-    - name: Check Kubernetes API connectivity
-      command: kubectl get nodes --kubeconfig=/home/ubuntu/.kube/config
-      register: kubectl_test
-      retries: 5
-      delay: 5
-      until: kubectl_test.rc == 0
-
-    - name: Restart kubelet
-      systemd:
-        name: kubelet
-        state: restarted
-        enabled: yes
-
-    - name: Sleep for Calico
-      shell: sleep 20
-
-    - name: Check 2 Kubernetes API connectivity
-      command: kubectl get nodes --kubeconfig=/home/ubuntu/.kube/config
-      register: kubectl_test
-      retries: 5
-      delay: 5
-      until: kubectl_test.rc == 0
-
-    - name: Install Calico dependencies
-      command: kubectl create -f /home/ubuntu/networking/tigera-operator.yaml --validate=false
-
-    - name: Apply custom Calico resources
-      command: kubectl create -f /home/ubuntu/networking/custom-resources.yaml  --validate=false
-
-    - name: Create a key for the CNI plugin
-      command: >
-        openssl req -newkey rsa:4096
-        -keyout /home/ubuntu/cni.key
-        -nodes
-        -out /home/ubuntu/cni.csr
-        -subj /CN=calico-cni
-      args:
-        chdir: /home/ubuntu
-
-    - name: Sign with certificate using the main Kubernetes CA
-      command: >
-        openssl x509 -req -in /home/ubuntu/cni.csr
-        -CA /etc/kubernetes/pki/ca.crt
-        -CAkey /etc/kubernetes/pki/ca.key
-        -CAcreateserial
-        -out /home/ubuntu/cni.crt
-        -days 365
-      args:
-        creates: /home/ubuntu/cni.crt
-
-    - name: Set the correct permissions for cni.crt
-      command: >
-        chown 1000:1000 /home/ubuntu/cni.crt
-
-    - name: Create a kubeconfig file for the CNI plugin to use to access Kubernetes
-      command: kubectl config view -o jsonpath='{.clusters[0].cluster.server}'
-      register: apiserver
-
-    - name: Config kubeconfig cluster
-      command: >
-        kubectl config set-cluster kubernetes
-        --certificate-authority=/etc/kubernetes/pki/ca.crt
-        --embed-certs=true
-        --server={{ apiserver.stdout }}
-        --kubeconfig=/home/ubuntu/cni.kubeconfig
-      args:
-        chdir: /home/ubuntu
-
-    - name: Config kubeconfig credential
-      command: >
-        kubectl config set-credentials calico-cni
-        --client-certificate=/home/ubuntu/cni.crt
-        --client-key=/home/ubuntu/cni.key
-        --embed-certs=true
-        --kubeconfig=/home/ubuntu/cni.kubeconfig
-      args:
-        chdir: /home/ubuntu
-
-    - name: Config kubeconfig default context
-      command: >
-        kubectl config set-context default
-        --cluster=kubernetes
-        --user=calico-cni
-        --kubeconfig=/home/ubuntu/cni.kubeconfig
-      args:
-        chdir: /home/ubuntu
-
-    - name: Use previous context for kubectl
-      command: kubectl config use-context default --kubeconfig=/home/ubuntu/cni.kubeconfig
-
-    - name: Define a cluster role the CNI plugin will use to access Kubernetes.
-      shell: "kubectl apply -f /home/ubuntu/networking/cluster-role.yaml"
-
-    - name: Define cluster-role-binding
-      shell: "kubectl create clusterrolebinding calico-cni --clusterrole=calico-cni --user=calico-cni"
