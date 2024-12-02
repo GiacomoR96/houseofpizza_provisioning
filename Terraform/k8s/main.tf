@@ -205,7 +205,7 @@ resource "aws_autoscaling_group" "worker" {
 */
 
 resource "aws_instance" "worker" {
-  count = 1  # Change this for using multiple instances of worker.
+  count = 2  # Change this for using multiple instances of worker.
 
   ami                    = "ami-0e86e20dae9224db8"
   instance_type          = "t2.medium"
@@ -261,6 +261,7 @@ aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
 }
 
 resource "null_resource" "worker_transfer_folder" {
+  count = "${length(aws_instance.worker.*.id)}"
 
   provisioner "file" {
     source      = "${path.module}/.ssh"
@@ -268,7 +269,7 @@ resource "null_resource" "worker_transfer_folder" {
 
     connection {
       type        = "ssh"
-      host        = aws_instance.worker[0].public_ip
+      host        = "${element(aws_instance.worker.*.public_ip, count.index)}"
       user        = "ubuntu"
       private_key = file(".ssh/terraform.pem")
     }
@@ -295,8 +296,10 @@ resource "null_resource" "ansible_provisioner_master" {
 }
 
 resource "null_resource" "ansible_provisioner_worker" {
+  count = "${length(aws_instance.worker.*.id)}"
+
   provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.worker[0].public_ip}, worker.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${element(aws_instance.worker.*.public_ip, count.index)}, worker.yml"
     working_dir = "${path.module}/playbooks"
   }
 
