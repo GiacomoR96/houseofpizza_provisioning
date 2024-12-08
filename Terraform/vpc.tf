@@ -15,13 +15,35 @@ resource "aws_vpc" "vpc" {
 }
 
 resource "aws_subnet" "public_subnet" {
-  count               = "${length(var.aws_zones)}"
+  count               = "${length(var.aws_zones_elb)}"
   vpc_id              = aws_vpc.vpc.id
-  cidr_block          = "${cidrsubnet(aws_vpc.vpc.cidr_block, 8, count.index)}"
-  availability_zone   = "${var.aws_zones[count.index]}"
+  cidr_block          = var.subnet_cidrs.public
+  availability_zone   = "${var.aws_zones_elb[count.index]}"
   
   tags = {
     Name = "${var.cluster_name}-public-subnet-${random_id.randomness.hex}"
+  }
+}
+
+resource "aws_subnet" "hybrid_subnet" {
+  count               = "${length(var.aws_zones_ec2)}"
+  vpc_id              = aws_vpc.vpc.id
+  cidr_block          = var.subnet_cidrs.hybrid
+  availability_zone   = "${var.aws_zones_ec2[count.index]}"
+  
+  tags = {
+    Name = "${var.cluster_name}-hybrid-subnet-${random_id.randomness.hex}"
+  }
+}
+
+resource "aws_subnet" "private_subnet" {
+  count               = "${length(var.aws_zones_db)}"
+  vpc_id              = aws_vpc.vpc.id
+  cidr_block          = var.subnet_cidrs.private
+  availability_zone   = "${var.aws_zones_db[count.index]}"
+  
+  tags = {
+    Name = "${var.cluster_name}-private-subnet-${random_id.randomness.hex}"
   }
 }
 
@@ -70,7 +92,7 @@ resource "aws_route_table" "route" {
 }
 
 resource "aws_route_table_association" "route" {
-  count           = "${length(var.aws_zones)}"
-  subnet_id       = "${element(aws_subnet.public_subnet.*.id, count.index)}"
+  count           = "${length(var.aws_zones_ec2)}"
+  subnet_id       = "${element(aws_subnet.hybrid_subnet.*.id, count.index)}"
   route_table_id  = aws_route_table.route.id
 }
