@@ -55,29 +55,6 @@ resource "aws_eip" "master" {
   domain = "vpc"
 }
 
-data "cloudinit_config" "master" {
-  gzip          = false
-  base64_encode = false
-
-  part {
-    filename     = "init-master.sh"
-    content_type = "text/x-shellscript"
-
-    content = templatefile("scripts/init-master.sh", {
-    kubeadm_token = templatefile("token/token-format.tpl", { token1 = join("", random_shuffle.token1.result), token2 = join("", random_shuffle.token2.result) } ),
-    ip_address    = aws_eip.master.public_ip,
-    cluster_name  = var.cluster_name,
-    aws_region    = var.AWS_REGION,
-    aws_subnets   = join(" ", concat("${aws_subnet.public_subnet.*.id}", ["${aws_subnet.public_subnet[0].id}"]))
-    })
-  }
-
-  depends_on = [
-    random_shuffle.token1,
-    random_shuffle.token2,
-  ]
-}
-
 resource "aws_instance" "master" {
   ami                     = "ami-0e86e20dae9224db8"
   instance_type           = "t2.medium"
@@ -85,7 +62,6 @@ resource "aws_instance" "master" {
   key_name                = aws_key_pair.keypair.key_name
   subnet_id               = aws_subnet.public_subnet[0].id
   iam_instance_profile    = aws_iam_instance_profile.master_profile.name
-  user_data               = data.cloudinit_config.master.rendered
   associate_public_ip_address = true
 
   tags = {
@@ -137,73 +113,6 @@ resource "aws_iam_instance_profile" "worker_profile" {
   role = aws_iam_role.worker_role.name
 }
 
-data "cloudinit_config" "worker" {
-  gzip          = false
-  base64_encode = true
-
-  part {
-    filename     = "init-worker.sh"
-    content_type = "text/x-shellscript"
-
-    content = templatefile("scripts/init-worker.sh", {
-    kubeadm_token = templatefile("token/token-format.tpl", { token1 = join("", random_shuffle.token1.result), token2 = join("", random_shuffle.token2.result) } ),
-    master_ip     = aws_eip.master.public_ip,
-    master_private_ip = aws_instance.master.private_ip,
-    })
-  }
-
-  depends_on = [
-    random_shuffle.token1,
-    random_shuffle.token2,
-  ]
-}
-/*
-resource "aws_launch_template" "worker" {
-  name = "${var.cluster_name}-worker"
-  image_id = "ami-0e86e20dae9224db8"
-  instance_type           = "t2.medium"
-  key_name                = aws_key_pair.keypair.key_name
-  user_data = data.cloudinit_config.worker.rendered
-
-  iam_instance_profile {
-    name = aws_iam_instance_profile.worker_profile.name
-  }
-
-  network_interfaces {
-    associate_public_ip_address = true
-    security_groups = ["${aws_security_group.kubernetes.id}"]
-  }
-
-  block_device_mappings {
-    device_name = "/dev/sdf"
-
-    ebs {
-      volume_size = 10
-    }
-  }
-
-  tag_specifications {
-    resource_type = "instance"
-
-    tags = {
-      Name = "${var.cluster_name}-worker"
-    }
-  }
-}
-
-resource "aws_autoscaling_group" "worker" {
-  desired_capacity   = 0
-  max_size           = 4
-  min_size           = 0
-  vpc_zone_identifier = [aws_subnet.public_subnet[0].id]
-
-  launch_template {
-    id      = aws_launch_template.worker.id
-    version = "$Latest"
-  }
-}
-*/
-
 resource "aws_instance" "worker" {
   count = 2  # Change this for using multiple instances of worker.
 
@@ -212,7 +121,6 @@ resource "aws_instance" "worker" {
   key_name               = aws_key_pair.keypair.key_name
   subnet_id              = aws_subnet.public_subnet[0].id
   iam_instance_profile   = aws_iam_instance_profile.worker_profile.name
-  user_data              = data.cloudinit_config.worker.rendered
   associate_public_ip_address = true
   vpc_security_group_ids  = [aws_security_group.kubernetes.id]
 
@@ -220,17 +128,6 @@ resource "aws_instance" "worker" {
     Name = "${var.cluster_name}-worker-${count.index}"
   }
 }
-
-
-/* TODO: Use this configuration for master, worker and db
->hosts.ini;
-	  [webserver]
-    ${aws_instance.master.public_ip}
-    ${aws_instance.worker[0].public_ip}
-    ${aws_instance.worker[1].public_ip}
-    [dbserve]
-    ${aws_instance.dbserver.public_ip}
-*/
 
 // Generate inventory file
 resource "local_file" "inventory" {
@@ -254,9 +151,8 @@ aws_access_key: "${file("credential_key/aws_access_key")}"
 aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
  EOF
 
-  // TODO: Add here reference for worker in future
   depends_on = [
-    aws_instance.master,
+    aws_instance.master
   ]
 }
 
@@ -284,7 +180,6 @@ resource "null_resource" "worker_transfer_folder" {
 // Ansible configuration for master node
 resource "null_resource" "ansible_provisioner_master" {
   provisioner "local-exec" {
-    //command = "ansible-playbook --private-key ${path.module}/.ssh/terraform.pem -i ${file("${path.module}/playbooks/hosts.ini")}, master.yml"
     command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master.yml"
     working_dir = "${path.module}/playbooks"
   }
@@ -295,6 +190,7 @@ resource "null_resource" "ansible_provisioner_master" {
 
 }
 
+// Ansible configuration for worker node
 resource "null_resource" "ansible_provisioner_worker" {
   count = "${length(aws_instance.worker.*.id)}"
 
@@ -308,12 +204,3 @@ resource "null_resource" "ansible_provisioner_worker" {
   ]
 
 }
-
-/*
-TODO : To improve ssh connection, use this with first tasks on all yml
-
-    - name: Write the new ec2 instance host key to known hosts
-      connection: local
-      shell: "ssh-keyscan -H {{ lookup('ini', 'master', file='hosts.ini') }} >> ~/.ssh/known_hosts"
-
-*/

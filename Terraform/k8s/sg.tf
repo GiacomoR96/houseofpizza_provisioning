@@ -53,14 +53,6 @@ resource "aws_security_group" "kubernetes" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  /*ingress {
-    description = "Allow the security group members to talk with each other without restrictions"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    //source_security_group_id = aws_security_group.kubernetes.id
-  }*/
-
   tags = {
     Name = "${var.cluster_name}-sg"
   }
