@@ -1,6 +1,6 @@
 # Problem with old instance profile created
-aws iam delete-instance-profile --instance-profile-name k8s-cluster-master
-aws iam delete-instance-profile --instance-profile-name k8s-cluster-worker
+aws iam delete-instance-profile --instance-profile-name k3s-cluster-master
+aws iam delete-instance-profile --instance-profile-name k3s-cluster-worker
 
 
 # View log on machine
@@ -16,7 +16,7 @@ chmod +x test2.sh
 
 
 
-#Status node k8s
+#Status node kubernetes
 kubectl describe node
 
 

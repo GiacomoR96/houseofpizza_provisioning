@@ -127,6 +127,6 @@
 
     - name: Fail if token does not exist
       fail:
-        msg: "Il file /home/ubuntu/token_worker non esiste!"
+        msg: "The token for joincluster does not exist!"
       when: token_file_status.stat.exists == false
 

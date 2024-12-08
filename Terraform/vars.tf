@@ -13,10 +13,10 @@ variable "ansible_user" {
 }
 
 #####
-# K8S variables
+# K3S variables
 #####
 
 variable "cluster_name" {
   description = "Name of the AWS Kubernetes cluster - will be used to name all created resources"
-  default = "k8s-cluster"
+  default = "k3s-cluster"
 }
