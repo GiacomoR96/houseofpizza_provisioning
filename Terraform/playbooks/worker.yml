@@ -1,0 +1,70 @@
+---
+- name: Configuration worker
+  hosts: all
+  gather_facts: false
+  become: yes
+  
+  tasks:
+    - include_vars: config_vars.yml
+
+    - debug: msg="Init configuration for worker node"
+
+    - debug: msg="worker config - ip_address, {{ ip_address }}"
+
+    - debug: msg="worker config - aws_subnets, {{ aws_access_key }}"
+
+    - debug: msg="worker config - aws_subnets, {{ aws_secret_access_key }}"
+
+    - debug: msg="worker config - master, {{ master }}"
+  
+    - name: Check if exists the keys.
+      stat:
+        path: /home/ubuntu/ssh_keys/terraform.pem
+      register: token_file_status
+
+    - name: Debug file status
+      debug:
+        var: token_file_status
+
+    - name: Fail if token does not exist
+      fail:
+        msg: "Il file /home/ubuntu/ssh_keys/terraform.pem non esiste!"
+      when: token_file_status.stat.exists == false
+
+    - name: Change permissions on file
+      shell: "chmod 400 /home/ubuntu/ssh_keys/terraform.pem"
+
+    - name: Disable UFW firewall
+      ufw:
+        state: disabled
+
+    - name: Allow API server port (6443/tcp)
+      ufw:
+        rule: allow
+        port: 6443
+        proto: tcp
+
+    - name: Allow pods network (10.42.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.42.0.0/16'
+        to: 'any'
+
+    - name: Allow services network (10.43.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.43.0.0/16'
+        to: 'any'
+
+    - name: Copy token from master to worker
+      shell: "scp -o StrictHostKeyChecking=no -i /home/ubuntu/ssh_keys/terraform.pem ubuntu@{{ master }}:/home/ubuntu/token_worker /home/ubuntu"
+
+    - name: Install K3S Worker using token from /home/ubuntu/token_worker
+      shell: |
+        curl -sfL https://get.k3s.io | K3S_URL=https://{{ master }}:6443 K3S_TOKEN=$(cat /home/ubuntu/token_worker) sh -
+      become: yes
+      args:
+        creates: /usr/local/bin/k3s
+
+    
+        

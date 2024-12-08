@@ -1,1 +1,17 @@
-ssh_key/
+
+# Parent folder
+.terraform
+terraform.tfstate
+terraform.tfstate.backup
+
+# AWS K3S
+Terraform/.terraform
+Terraform/terraform.tfstate
+Terraform/terraform.tfstate.backup
+Terraform/.terraform.tfstate.lock.info
+Terraform/.terraform.lock.hcl
+Terraform/credential_key/aws_access_key
+Terraform/credential_key/aws_secret_access_key
+Terraform/credential_key/aws_session_token
+Terraform/.ssh/terraform.pem
+Terraform/.ssh/terraform.pub
