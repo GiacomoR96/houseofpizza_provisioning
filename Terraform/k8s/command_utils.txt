@@ -13,3 +13,18 @@ more -d /var/log/init-master.log
 cd /var/lib/cloud/instance/scripts/
 
 chmod +x test2.sh
+
+
+
+#Status node k8s
+kubectl describe node
+
+
+#Status all pods
+kubectl get pods -A
+
+#Status single pod (which could be in error)
+kubectl get pods -n kube-system kube-controller-manager-ip-10-0-0-73
+
+#Kubelet service status
+systemctl status kubelet.service

@@ -1,0 +1,132 @@
+---
+- name: Configuration master
+  hosts: all
+  gather_facts: false
+  become: yes
+  
+  tasks:
+    - include_vars: config_vars.yml
+
+    - debug: msg="Init configuration for master node"
+
+    - debug: msg="Master config - IP, {{ master }}"
+
+    - debug: msg="Master config - kubeadm_token, {{ kubeadm_token }}"
+
+    - debug: msg="Master config - ip_address, {{ ip_address }}"
+
+    - debug: msg="Master config - cluster_name, {{ cluster_name }}"
+
+    - debug: msg="Master config - aws_region, {{ aws_region }}"
+
+    - debug: msg="Master config - aws_subnets, {{ aws_subnets }}"
+
+    - debug: msg="Master config - aws_subnets, {{ aws_access_key }}"
+
+    - debug: msg="Master config - aws_subnets, {{ aws_secret_access_key }}"
+
+    - name: Creates directory aws credential
+      ansible.builtin.file:
+        path: /home/ubuntu/.aws
+        state: directory
+  
+    - name: Add aws_access_key file
+      copy:
+        dest: "/home/ubuntu/.aws/aws_access_key"
+        content: |
+          {{ aws_access_key }}
+  
+    - name: Add aws_secret_access_key file
+      copy:
+        dest: "/home/ubuntu/.aws/aws_secret_access_key"
+        content: |
+          {{ aws_secret_access_key }}
+
+    - name: Execute the Uptime command over Command module
+      register: uptimeoutput
+      command: "uptime"
+
+    - debug:
+        var: uptimeoutput.stdout_lines
+  
+    - name: Install AWS CLI client
+      block:
+        - name: Download AWS CLI
+          shell: "curl -o awscliv2.zip https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+        
+        - name: Install unzip
+          apt:
+            name: unzip
+            state: present
+        
+        - name: Extract AWS CLI
+          shell: "unzip awscliv2.zip > /dev/null"
+        
+        - name: Run AWS CLI installer
+          shell: "sudo ./aws/install"
+      tags: 
+        - aws_cli
+  
+    - name: Tag subnets
+      block:
+        - name: Tag subnets
+          shell: "for SUBNET in {{ aws_subnets }}; do aws ec2 create-tags --resources $SUBNET --tags Key=kubernetes.io/cluster/{{ cluster_name }},Value=shared --region {{ aws_region }}; done"
+      tags:
+        - tag_subnets
+  
+    - name: Disable UFW firewall
+      ufw:
+        state: disabled
+
+    - name: Allow API server port (6443/tcp)
+      ufw:
+        rule: allow
+        port: 6443
+        proto: tcp
+
+    - name: Allow pods network (10.42.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.42.0.0/16'
+        to: 'any'
+
+    - name: Allow services network (10.43.0.0/16)
+      ufw:
+        rule: allow
+        src: '10.43.0.0/16'
+        to: 'any'
+
+    - name: Install K3S using curl (master node)
+      shell: curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Set KUBECONFIG environment variable
+      lineinfile:
+        path: /etc/profile
+        line: 'export KUBECONFIG=/etc/rancher/k3s/k3s.yaml'
+
+    - name: Save K3S token to /home/ubuntu/token_worker
+      shell: cat /var/lib/rancher/k3s/server/node-token > /home/ubuntu/token_worker
+      register: token_output
+
+    - name: Set the correct owner and permissions for token file
+      ansible.builtin.file:
+        path: /home/ubuntu/token_worker
+        owner: ubuntu
+        mode: '0644'
+
+    - name: Check if exists the keys.
+      stat:
+        path: /home/ubuntu/token_worker
+      register: token_file_status
+
+    - name: Debug file status
+      debug:
+        var: token_file_status
+
+    - name: Fail if token does not exist
+      fail:
+        msg: "Il file /home/ubuntu/token_worker non esiste!"
+      when: token_file_status.stat.exists == false
+
