@@ -60,7 +60,7 @@ resource "aws_instance" "master" {
   instance_type           = "t2.medium"
   vpc_security_group_ids  = [aws_security_group.kubernetes.id]
   key_name                = aws_key_pair.keypair.key_name
-  subnet_id               = aws_subnet.public_subnet[0].id
+  subnet_id               = aws_subnet.hybrid_subnet[0].id
   iam_instance_profile    = aws_iam_instance_profile.master_profile.name
   associate_public_ip_address = true
 
@@ -119,7 +119,7 @@ resource "aws_instance" "worker" {
   ami                    = "ami-0e86e20dae9224db8"
   instance_type          = "t2.medium"
   key_name               = aws_key_pair.keypair.key_name
-  subnet_id              = aws_subnet.public_subnet[0].id
+  subnet_id              = aws_subnet.hybrid_subnet[0].id
   iam_instance_profile   = aws_iam_instance_profile.worker_profile.name
   associate_public_ip_address = true
   vpc_security_group_ids  = [aws_security_group.kubernetes.id]
@@ -141,7 +141,7 @@ kubeadm_token: "${templatefile("token/token-format.tpl", { token1 = join("", ran
 ip_address: "${aws_eip.master.public_ip}"
 cluster_name: "${var.cluster_name}"
 aws_region: "${var.AWS_REGION}"
-aws_subnets: "${join(" ", concat("${aws_subnet.public_subnet.*.id}", ["${aws_subnet.public_subnet[0].id}"]))}"
+aws_subnets: "${join(" ", concat("${aws_subnet.hybrid_subnet.*.id}", ["${aws_subnet.hybrid_subnet[0].id}"]))}"
 
 aws_access_key: "${file("credential_key/aws_access_key")}"
 aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
