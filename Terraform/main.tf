@@ -1,8 +1,7 @@
 data "aws_availability_zones" "available" {}
 
-resource "random_string" "suffix" {
-  length  = 16
-  special = false
+resource "random_id" "randomness" {
+  byte_length = 16
 }
 
 resource "random_shuffle" "token1" {
@@ -23,6 +22,21 @@ resource "aws_key_pair" "keypair" {
   key_name   = var.cluster_name
   public_key = file(".ssh/terraform.pub")
 }
+
+#####
+# S3 configuration
+#####
+
+resource "aws_s3_bucket" "jenkins-artifacts" {
+  bucket = "jenkins-artifacts-${random_id.randomness.hex}"
+
+  tags = {
+    Name = "jenkins_artifacts"
+  }
+}
+
+// See this for pipeline
+// https://medium.com/@haroldfinch01/how-to-build-a-ci-cd-pipeline-for-terraform-infrastructure-3e7cab9fcdf7
 
 #####
 # Database configuration
