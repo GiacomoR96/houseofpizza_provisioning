@@ -17,33 +17,33 @@ resource "aws_vpc" "vpc" {
 resource "aws_subnet" "public_subnet" {
   count               = "${length(var.aws_zones_elb)}"
   vpc_id              = aws_vpc.vpc.id
-  cidr_block          = var.subnet_cidrs.public
+  cidr_block          = cidrsubnet(var.subnet_cidrs.public, 4, count.index)
   availability_zone   = "${var.aws_zones_elb[count.index]}"
   
   tags = {
-    Name = "${var.cluster_name}-public-subnet-${random_id.randomness.hex}"
+    Name = "${var.cluster_name}-public-subnet-${count.index}"
   }
 }
 
 resource "aws_subnet" "hybrid_subnet" {
   count               = "${length(var.aws_zones_ec2)}"
   vpc_id              = aws_vpc.vpc.id
-  cidr_block          = var.subnet_cidrs.hybrid
+  cidr_block          = cidrsubnet(var.subnet_cidrs.hybrid, 4, count.index)
   availability_zone   = "${var.aws_zones_ec2[count.index]}"
   
   tags = {
-    Name = "${var.cluster_name}-hybrid-subnet-${random_id.randomness.hex}"
+    Name = "${var.cluster_name}-hybrid-subnet-${count.index}"
   }
 }
 
 resource "aws_subnet" "private_subnet" {
   count               = "${length(var.aws_zones_db)}"
   vpc_id              = aws_vpc.vpc.id
-  cidr_block          = var.subnet_cidrs.private
+  cidr_block          = cidrsubnet(var.subnet_cidrs.private, 8, count.index)
   availability_zone   = "${var.aws_zones_db[count.index]}"
   
   tags = {
-    Name = "${var.cluster_name}-private-subnet-${random_id.randomness.hex}"
+    Name = "${var.cluster_name}-private-subnet-${count.index}"
   }
 }
 
@@ -62,15 +62,12 @@ resource "aws_eip" "nat" {
 
 resource "aws_nat_gateway" "nat" {
   allocation_id = aws_eip.nat.id
-  //subnet_id     = aws_subnet.public_subnet.id
   subnet_id = "${element(aws_subnet.public_subnet.*.id, 0)}"
 
   tags = {
     Name = "${var.cluster_name}-gw-nat"
   }
 
-  # To ensure proper ordering, it is recommended to add an explicit dependency
-  # on the Internet Gateway for the VPC.
   depends_on = [aws_subnet.public_subnet, aws_internet_gateway.gw, aws_eip.nat]
 }
 

@@ -176,7 +176,7 @@ resource "null_resource" "worker_transfer_folder" {
 // Ansible configuration for master node
 resource "null_resource" "ansible_provisioner_master" {
   provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -u ubuntu -i ${aws_instance.master.public_ip}, master.yml"
     working_dir = "${path.module}/playbooks"
   }
 
@@ -191,7 +191,7 @@ resource "null_resource" "ansible_provisioner_worker" {
   count = "${length(aws_instance.worker.*.id)}"
 
   provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${element(aws_instance.worker.*.public_ip, count.index)}, worker.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -u ubuntu -i ${element(aws_instance.worker.*.public_ip, count.index)}, worker.yml"
     working_dir = "${path.module}/playbooks"
   }
 
@@ -200,3 +200,93 @@ resource "null_resource" "ansible_provisioner_worker" {
   ]
 
 }
+
+#####
+# Application Load Balancer configuration
+#####
+
+resource "aws_lb" "application_lb" {
+  name               = "${var.cluster_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = aws_subnet.public_subnet.*.id
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "${var.cluster_name}-alb"
+  }
+}
+
+resource "aws_security_group" "alb_sg" {
+  name_prefix = "${var.cluster_name}-alb-sg"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-alb-sg"
+  }
+}
+
+resource "aws_lb_target_group" "target_group" {
+  name        = "${var.cluster_name}-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.vpc.id
+  target_type = "instance"
+
+  health_check {
+    interval            = 30
+    path                = "/"
+    protocol            = "HTTP"
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-tg"
+  }
+}
+
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.application_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.target_group.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "ec2_attachment" {
+  count            = length(aws_instance.worker.*.id)
+  target_group_arn = aws_lb_target_group.target_group.arn
+  target_id        = aws_instance.worker.*.id[count.index]
+  port             = 80
+}
+
+
+
