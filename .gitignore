@@ -10,8 +10,12 @@ Terraform/terraform.tfstate
 Terraform/terraform.tfstate.backup
 Terraform/.terraform.tfstate.lock.info
 Terraform/.terraform.lock.hcl
+
+# Credential
+Terraform/.ssh/terraform.pem
+Terraform/.ssh/terraform.pub
+Terraform/connection_key/application/.env
+Terraform/connection_key/database/.env
 Terraform/credential_key/aws_access_key
 Terraform/credential_key/aws_secret_access_key
 Terraform/credential_key/aws_session_token
-Terraform/.ssh/terraform.pem
-Terraform/.ssh/terraform.pub
