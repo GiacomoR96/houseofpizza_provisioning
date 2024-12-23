@@ -1,0 +1,21 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: houseofpizza-deployment
+  labels:
+    app: houseofpizza
+spec:
+  replicas: 2  # Number of replicas
+  selector:
+    matchLabels:
+      app: houseofpizza
+  template:
+    metadata:
+      labels:
+        app: houseofpizza
+    spec:
+      containers:
+        - name: houseofpizza
+          image: houseofpizza:latest  # Ref image Docker
+          ports:
+            - containerPort: 4001  # Port of container
