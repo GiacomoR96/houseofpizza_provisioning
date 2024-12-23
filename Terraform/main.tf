@@ -86,6 +86,26 @@ resource "aws_instance" "master" {
 
 }
 
+resource "null_resource" "master_transfer_folder" {
+
+  provisioner "file" {
+    source      = "${path.module}/kubernetes"
+    destination = "/home/ubuntu/kubernetes"
+
+    connection {
+      type        = "ssh"
+      host        = "${aws_instance.master.public_ip}"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    aws_instance.master
+  ]
+
+}
+
 #####
 # Worker configuration
 #####
