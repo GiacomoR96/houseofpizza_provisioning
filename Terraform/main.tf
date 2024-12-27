@@ -28,7 +28,6 @@ resource "aws_key_pair" "keypair" {
 # Database configuration
 #####
 
-// TODO : Change subnet with private_subnet
 resource "aws_instance" "database" {
   ami                     = "ami-0e86e20dae9224db8"
   instance_type           = "t2.medium"
