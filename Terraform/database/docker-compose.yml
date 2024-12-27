@@ -10,4 +10,4 @@ services:
     volumes:
       - ./postgres/create-schema.sql:/docker-entrypoint-initdb.d/create-schema.sql
     env_file:
-      - ${PATH_CONNECTION_KEY}/database/.env
+      - .env

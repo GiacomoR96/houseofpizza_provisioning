@@ -39,5 +39,5 @@
     - name: Add current user to docker group to run commands without sudo 
       shell: "sudo usermod -aG docker $USER"
 
-    - name: Database container creation and execution
+    - name: Database container creation and detached execution
       shell: "cd /home/ubuntu/database/ && docker-compose up -d"
