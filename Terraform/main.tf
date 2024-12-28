@@ -25,6 +25,60 @@ resource "aws_key_pair" "keypair" {
 }
 
 #####
+# Database configuration
+#####
+
+resource "aws_instance" "database" {
+  ami                     = "ami-0e86e20dae9224db8"
+  instance_type           = "t2.medium"
+  vpc_security_group_ids  = [aws_security_group.kubernetes.id]
+  key_name                = aws_key_pair.keypair.key_name
+  subnet_id               = aws_subnet.private_subnet[0].id
+  associate_public_ip_address = true
+
+  tags = {
+    Name = "database-instance"
+  }
+
+}
+
+resource "null_resource" "database_transfer_folder" {
+  count = "${length(aws_instance.database.*.id)}"
+
+  provisioner "file" {
+    source      = "${path.module}/database"
+    destination = "/home/ubuntu/database"
+
+    connection {
+      type        = "ssh"
+      host        = "${element(aws_instance.database.*.public_ip, count.index)}"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    aws_instance.database
+  ]
+
+}
+
+// Ansible configuration for database node
+resource "null_resource" "ansible_provisioner_database" {
+  count = "${length(aws_instance.database.*.id)}"
+
+  provisioner "local-exec" {
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${element(aws_instance.database.*.public_ip, count.index)}, database.yml"
+    working_dir = "${path.module}/playbooks"
+  }
+
+  depends_on = [
+    null_resource.database_transfer_folder
+  ]
+
+}
+
+#####
 # Master configuration
 #####
 
@@ -76,13 +130,54 @@ resource "aws_instance" "master" {
       user        = "ubuntu"
       private_key = file(".ssh/terraform.pem")
       host        = self.public_ip
-      timeout     = "5m"
+      timeout     = "1m"
     }
   
     inline = [
       "sudo apt install python3 -y"
     ]
   }
+
+  depends_on = [
+    aws_instance.database
+  ]
+
+}
+
+resource "null_resource" "enrich_informations_to_master_deployment" {
+  provisioner "local-exec" {
+    command = <<EOT
+cp ${path.module}/database/.env ${path.module}/kubernetes/be/.env
+if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kubernetes/be/.env | wc -l)" -eq 0 ]; then
+    echo >> ${path.module}/kubernetes/be/.env
+fi
+echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
+    EOT
+  }
+
+  depends_on = [
+    aws_instance.master
+  ]
+
+}
+
+resource "null_resource" "master_deployment_folder" {
+
+  provisioner "file" {
+    source      = "${path.module}/kubernetes"
+    destination = "/home/ubuntu/kubernetes"
+
+    connection {
+      type        = "ssh"
+      host        = "${aws_instance.master.public_ip}"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    null_resource.enrich_informations_to_master_deployment
+  ]
 
 }
 

@@ -45,6 +45,24 @@ resource "aws_security_group" "kubernetes" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  # TODO : Modify this rule for restrict connection on database container
+  ingress {
+    description = "Connection database container"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # TODO : Modify this rule for restrict connection on be container
+  ingress {
+    description = "Connection be container"
+    from_port   = 4001
+    to_port     = 4001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   #Allow all outbound requests
   egress {
     from_port   = 0

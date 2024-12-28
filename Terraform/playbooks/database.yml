@@ -1,0 +1,43 @@
+---
+- name: Configuration database
+  hosts: all
+  gather_facts: false
+  become: yes
+  
+  tasks:
+    - debug: msg="Starting configuration database.."
+
+    - name: Check if the directory configuration database exists.
+      stat:
+        path: /home/ubuntu/database
+      register: directory_status
+
+    - name: Debug directory status
+      debug:
+        var: directory_status
+
+    - name: Fail if directory does not exist
+      fail:
+        msg: "The directory for configuration database does not exist!"
+      when: directory_status.stat.exists == false or directory_status.stat.isdir == false
+
+    - name: Updating dependencies
+      shell: "sudo apt update"
+
+    - name: Install docker
+      shell: "sudo apt install -y docker.io"
+
+    - name: Enable docker
+      shell: "sudo systemctl enable --now docker"
+
+    - name: Download and saving docker-compose
+      shell: "sudo curl -L https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose"
+
+    - name: Set execution permissions docker-compose
+      shell: "sudo chmod +x /usr/local/bin/docker-compose"
+
+    - name: Add current user to docker group to run commands without sudo 
+      shell: "sudo usermod -aG docker $USER"
+
+    - name: Database container creation and detached execution
+      shell: "cd /home/ubuntu/database/ && docker-compose up -d"
