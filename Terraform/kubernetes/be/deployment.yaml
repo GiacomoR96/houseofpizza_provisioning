@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: houseofpizza-deployment
+  labels:
+    app: houseofpizza
+spec:
+  replicas: 2  # Number of replicas
+  selector:
+    matchLabels:
+      app: houseofpizza
+  template:
+    metadata:
+      labels:
+        app: houseofpizza
+    spec:
+      containers:
+        - name: houseofpizza
+          image: jakino/houseofpizza:latest  # Ref image Docker
+          ports:
+            - containerPort: 4001  # Port of container
+          envFrom:
+            - configMapRef:
+                name: be-config
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: houseofpizza-service
+spec:
+  selector:
+    app: houseofpizza
+  ports:
+    - protocol: TCP
+      port: 4001  # Port on which the service will be displayed
+      targetPort: 4001  # Internal pod port
+  type: LoadBalancer  # Tipe of service (ClusterIP, NodePort, ecc.)
