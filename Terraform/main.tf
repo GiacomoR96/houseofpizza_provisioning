@@ -122,22 +122,6 @@ resource "aws_instance" "master" {
     Name = "master-instance"
   }
 
-  provisioner "remote-exec" {
-    # Establishes connection to be used by all
-    # generic remote provisioners (i.e. file/remote-exec)
-    connection {
-      type        = "ssh"
-      user        = "ubuntu"
-      private_key = file(".ssh/terraform.pem")
-      host        = self.public_ip
-      timeout     = "1m"
-    }
-  
-    inline = [
-      "sudo apt install python3 -y"
-    ]
-  }
-
   depends_on = [
     aws_instance.database
   ]
@@ -353,5 +337,20 @@ resource "aws_lb_target_group_attachment" "ec2_attachment" {
   port             = 80
 }
 
+resource "null_resource" "resolve_alb_ip" {
+  provisioner "local-exec" {
+    command = <<EOT
+      nslookup ${aws_lb.application_lb.dns_name} | grep 'Address:' | tail -n +2 | awk '{print $2}' > alb_ips.txt
+    EOT
+  }
 
+  triggers = {
+    alb_dns = aws_lb.application_lb.dns_name
+  }
+
+  depends_on = [
+    aws_lb.application_lb
+  ]
+
+}
 
