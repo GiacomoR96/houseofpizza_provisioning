@@ -4,15 +4,15 @@ variable "AWS_REGION" {
 
 variable "subnet_cidrs" {
   default = {
-    public  = "10.0.0.0/24"   # Subnet for Load Balancer (ELB)
-    hybrid  = "10.0.1.0/24"   # Subnet for instances EC2
-    private = "10.0.2.0/28"   # Subnet for database (DB)
+    public  = "10.0.0.0/20"   # Subnet for Load Balancer (ELB)
+    hybrid  = "10.0.16.0/20"  # Subnet for instances EC2
+    private = "10.0.32.0/20"  # Subnet for database (DB)
   }
 }
 
 variable "aws_zones_elb" {
   type = list
-  default = ["us-east-1a"]
+  default = ["us-east-1a", "us-east-1d"]
 }
 
 variable "aws_zones_ec2" {
