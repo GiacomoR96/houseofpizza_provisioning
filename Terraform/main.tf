@@ -118,6 +118,22 @@ resource "aws_instance" "master" {
   iam_instance_profile    = aws_iam_instance_profile.master_profile.name
   associate_public_ip_address = true
 
+  provisioner "remote-exec" {
+    # Establishes connection to be used by all
+    # generic remote provisioners (i.e. file/remote-exec)
+    connection {
+      type        = "ssh"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+      host        = self.public_ip
+      timeout     = "1m"
+    }
+
+    inline = [
+      "sudo apt install python3 -y"
+    ]
+  }
+
   tags = {
     Name = "master-instance"
   }
@@ -255,7 +271,7 @@ resource "null_resource" "worker_transfer_folder" {
 // Ansible configuration for master node
 resource "null_resource" "ansible_provisioner_master" {
   provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -u ubuntu -i ${aws_instance.master.public_ip}, master.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master.yml"
     working_dir = "${path.module}/playbooks"
   }
 
@@ -270,7 +286,7 @@ resource "null_resource" "ansible_provisioner_worker" {
   count = "${length(aws_instance.worker.*.id)}"
 
   provisioner "local-exec" {
-    command = "ansible-playbook --private-key ../.ssh/terraform.pem -u ubuntu -i ${element(aws_instance.worker.*.public_ip, count.index)}, worker.yml"
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${element(aws_instance.worker.*.public_ip, count.index)}, worker.yml"
     working_dir = "${path.module}/playbooks"
   }
 

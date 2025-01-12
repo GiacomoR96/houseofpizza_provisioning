@@ -54,11 +54,20 @@ resource "aws_security_group" "kubernetes" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # TODO : Modify this rule for restrict connection on be container
+  # TODO : Modify this rule for restrict connection on BE container
   ingress {
-    description = "Connection be container"
+    description = "Connection BE container"
     from_port   = 4001
     to_port     = 4001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # TODO : Modify this rule for restrict connection on FE container
+  ingress {
+    description = "Connection FE container"
+    from_port   = 30007
+    to_port     = 30007
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }

@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: houseofpizza-ui-deployment
+  labels:
+    app: houseofpizza-ui
+spec:
+  replicas: 2  # Number of replicas
+  selector:
+    matchLabels:
+      app: houseofpizza-ui
+  template:
+    metadata:
+      labels:
+        app: houseofpizza-ui
+    spec:
+      containers:
+      - name: houseofpizza-ui
+        image: jakino/houseofpizza-ui:latest  # Ref image Docker
+        ports:
+        - containerPort: 80  # Port of container
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: houseofpizza-ui-service
+spec:
+  selector:
+    app: houseofpizza-ui
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30007
+  type: NodePort
