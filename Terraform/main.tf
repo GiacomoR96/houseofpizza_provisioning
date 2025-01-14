@@ -144,43 +144,6 @@ resource "aws_instance" "master" {
 
 }
 
-resource "null_resource" "enrich_informations_to_master_deployment" {
-  provisioner "local-exec" {
-    command = <<EOT
-cp ${path.module}/database/.env ${path.module}/kubernetes/be/.env
-if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kubernetes/be/.env | wc -l)" -eq 0 ]; then
-    echo >> ${path.module}/kubernetes/be/.env
-fi
-echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
-    EOT
-  }
-
-  depends_on = [
-    aws_instance.master
-  ]
-
-}
-
-resource "null_resource" "master_deployment_folder" {
-
-  provisioner "file" {
-    source      = "${path.module}/kubernetes"
-    destination = "/home/ubuntu/kubernetes"
-
-    connection {
-      type        = "ssh"
-      host        = "${aws_instance.master.public_ip}"
-      user        = "ubuntu"
-      private_key = file(".ssh/terraform.pem")
-    }
-  }
-
-  depends_on = [
-    null_resource.enrich_informations_to_master_deployment
-  ]
-
-}
-
 #####
 # Worker configuration
 #####
@@ -224,6 +187,45 @@ resource "aws_instance" "worker" {
   }
 }
 
+
+resource "null_resource" "enrich_informations_to_master_deployment" {
+  provisioner "local-exec" {
+    command = <<EOT
+cp ${path.module}/database/.env ${path.module}/kubernetes/be/.env
+if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kubernetes/be/.env | wc -l)" -eq 0 ]; then
+    echo >> ${path.module}/kubernetes/be/.env
+fi
+echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
+echo 'REACT_APP_API_URL=${aws_instance.worker[0].public_ip}' >> ${path.module}/kubernetes/fe/.env
+    EOT
+  }
+
+  depends_on = [
+    aws_instance.worker
+  ]
+
+}
+
+resource "null_resource" "master_deployment_folder" {
+
+  provisioner "file" {
+    source      = "${path.module}/kubernetes"
+    destination = "/home/ubuntu/kubernetes"
+
+    connection {
+      type        = "ssh"
+      host        = "${aws_instance.master.public_ip}"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    null_resource.enrich_informations_to_master_deployment
+  ]
+
+}
+
 // Generate inventory file
 resource "local_file" "inventory" {
  filename = "${path.module}/playbooks/config_vars.yml"
@@ -243,7 +245,7 @@ aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
  EOF
 
   depends_on = [
-    aws_instance.master
+    null_resource.enrich_informations_to_master_deployment
   ]
 }
 

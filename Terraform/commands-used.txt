@@ -8,7 +8,7 @@ sudo kubectl apply -f deployment.yaml
 # compact version
 cd /home/ubuntu/kubernetes/be && sudo kubectl create configmap be-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml
 
-cd /home/ubuntu/kubernetes/fe && sudo kubectl apply -f deployment.yaml
+cd /home/ubuntu/kubernetes/fe && sudo kubectl create configmap fe-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml
 
 ## Verify status execution
 # Get status pods

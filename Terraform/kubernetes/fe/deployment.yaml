@@ -18,7 +18,10 @@ spec:
       - name: houseofpizza-ui
         image: jakino/houseofpizza-ui:latest  # Ref image Docker
         ports:
-        - containerPort: 80  # Port of container
+          - containerPort: 80  # Port of container
+        envFrom:
+          - configMapRef:
+              name: fe-config
 
 ---
 apiVersion: v1
