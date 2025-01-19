@@ -19,3 +19,4 @@ Terraform/credential_key/aws_secret_access_key
 Terraform/credential_key/aws_session_token
 Terraform/database/.env
 Terraform/kubernetes/be/.env
+Terraform/kubernetes/fe/.env

@@ -118,10 +118,6 @@ resource "aws_instance" "master" {
   iam_instance_profile    = aws_iam_instance_profile.master_profile.name
   associate_public_ip_address = true
 
-  tags = {
-    Name = "master-instance"
-  }
-
   provisioner "remote-exec" {
     # Establishes connection to be used by all
     # generic remote provisioners (i.e. file/remote-exec)
@@ -132,51 +128,18 @@ resource "aws_instance" "master" {
       host        = self.public_ip
       timeout     = "1m"
     }
-  
+
     inline = [
       "sudo apt install python3 -y"
     ]
   }
 
+  tags = {
+    Name = "master-instance"
+  }
+
   depends_on = [
     aws_instance.database
-  ]
-
-}
-
-resource "null_resource" "enrich_informations_to_master_deployment" {
-  provisioner "local-exec" {
-    command = <<EOT
-cp ${path.module}/database/.env ${path.module}/kubernetes/be/.env
-if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kubernetes/be/.env | wc -l)" -eq 0 ]; then
-    echo >> ${path.module}/kubernetes/be/.env
-fi
-echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
-    EOT
-  }
-
-  depends_on = [
-    aws_instance.master
-  ]
-
-}
-
-resource "null_resource" "master_deployment_folder" {
-
-  provisioner "file" {
-    source      = "${path.module}/kubernetes"
-    destination = "/home/ubuntu/kubernetes"
-
-    connection {
-      type        = "ssh"
-      host        = "${aws_instance.master.public_ip}"
-      user        = "ubuntu"
-      private_key = file(".ssh/terraform.pem")
-    }
-  }
-
-  depends_on = [
-    null_resource.enrich_informations_to_master_deployment
   ]
 
 }
@@ -224,6 +187,45 @@ resource "aws_instance" "worker" {
   }
 }
 
+
+resource "null_resource" "enrich_informations_to_master_deployment" {
+  provisioner "local-exec" {
+    command = <<EOT
+cp ${path.module}/database/.env ${path.module}/kubernetes/be/.env
+if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kubernetes/be/.env | wc -l)" -eq 0 ]; then
+    echo >> ${path.module}/kubernetes/be/.env
+fi
+echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
+echo 'REACT_APP_API_URL=${aws_instance.worker[0].public_ip}' >> ${path.module}/kubernetes/fe/.env
+    EOT
+  }
+
+  depends_on = [
+    aws_instance.worker
+  ]
+
+}
+
+resource "null_resource" "master_deployment_folder" {
+
+  provisioner "file" {
+    source      = "${path.module}/kubernetes"
+    destination = "/home/ubuntu/kubernetes"
+
+    connection {
+      type        = "ssh"
+      host        = "${aws_instance.master.public_ip}"
+      user        = "ubuntu"
+      private_key = file(".ssh/terraform.pem")
+    }
+  }
+
+  depends_on = [
+    null_resource.enrich_informations_to_master_deployment
+  ]
+
+}
+
 // Generate inventory file
 resource "local_file" "inventory" {
  filename = "${path.module}/playbooks/config_vars.yml"
@@ -243,7 +245,7 @@ aws_secret_access_key: "${file("credential_key/aws_secret_access_key")}"
  EOF
 
   depends_on = [
-    aws_instance.master
+    null_resource.enrich_informations_to_master_deployment
   ]
 }
 
@@ -295,3 +297,78 @@ resource "null_resource" "ansible_provisioner_worker" {
   ]
 
 }
+
+#####
+# Application Load Balancer configuration
+#####
+
+resource "aws_lb" "application_lb" {
+  name               = "${var.cluster_name}-alb"
+  internal           = false
+  load_balancer_type = "application"
+  security_groups    = [aws_security_group.alb_sg.id]
+  subnets            = aws_subnet.public_subnet.*.id
+
+  enable_deletion_protection = false
+
+  tags = {
+    Name = "${var.cluster_name}-alb"
+  }
+}
+
+resource "aws_lb_target_group" "target_group" {
+  name        = "${var.cluster_name}-tg"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.vpc.id
+  target_type = "instance"
+
+  health_check {
+    interval            = 30
+    path                = "/"
+    protocol            = "HTTP"
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-tg"
+  }
+}
+
+resource "aws_lb_listener" "http_listener" {
+  load_balancer_arn = aws_lb.application_lb.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.target_group.arn
+  }
+}
+
+resource "aws_lb_target_group_attachment" "ec2_attachment" {
+  count            = length(aws_instance.worker.*.id)
+  target_group_arn = aws_lb_target_group.target_group.arn
+  target_id        = aws_instance.worker.*.id[count.index]
+  port             = 80
+}
+
+resource "null_resource" "resolve_alb_ip" {
+  provisioner "local-exec" {
+    command = <<EOT
+      nslookup ${aws_lb.application_lb.dns_name} | grep 'Address:' | tail -n +2 | awk '{print $2}' > alb_ips.txt
+    EOT
+  }
+
+  triggers = {
+    alb_dns = aws_lb.application_lb.dns_name
+  }
+
+  depends_on = [
+    aws_lb.application_lb
+  ]
+
+}
+
