@@ -54,11 +54,20 @@ resource "aws_security_group" "kubernetes" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # TODO : Modify this rule for restrict connection on be container
+  # TODO : Modify this rule for restrict connection on BE container
   ingress {
-    description = "Connection be container"
+    description = "Connection BE container"
     from_port   = 4001
     to_port     = 4001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # TODO : Modify this rule for restrict connection on FE container
+  ingress {
+    description = "Connection FE container"
+    from_port   = 30007
+    to_port     = 30007
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -75,4 +84,34 @@ resource "aws_security_group" "kubernetes" {
     Name = "${var.cluster_name}-sg"
   }
 
+}
+
+resource "aws_security_group" "alb_sg" {
+  name_prefix = "${var.cluster_name}-alb-sg"
+  vpc_id      = aws_vpc.vpc.id
+
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.cluster_name}-alb-sg"
+  }
 }

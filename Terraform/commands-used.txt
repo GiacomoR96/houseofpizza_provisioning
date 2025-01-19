@@ -6,22 +6,27 @@ cd /home/ubuntu/kubernetes/be
 sudo kubectl create configmap be-config --from-env-file=.env
 sudo kubectl apply -f deployment.yaml
 # compact version
-cd kubernetes/be && sudo kubectl create configmap be-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml
+cd /home/ubuntu/kubernetes/be && sudo kubectl create configmap be-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml
 
+cd /home/ubuntu/kubernetes/fe && sudo kubectl create configmap fe-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml
 
 ## Verify status execution
 # Get status pods
 sudo kubectl get pods
 sudo kubectl get pods -o wide
+sudo kubectl get pods --all-namespaces
 
 # Get logs pod
-sudo kubectl logs houseofpizza-deployment-564f9ddd9c-7hc2t
+sudo kubectl logs pod_name
 
 # Describe pod created
 sudo kubectl describe pod houseofpizza-deployment-786bd7d5db-js6kj
 
 sudo kubectl get services
 sudo kubectl get endpoints houseofpizza-service
+
+#Example connect sh inside container
+sudo kubectl exec -it pod_name -- /bin/sh
 
 
 ## Example reference application execution
