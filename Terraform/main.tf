@@ -196,12 +196,12 @@ if [ -s ${path.module}/kubernetes/be/.env ] && [ "$(tail -c 1 ${path.module}/kub
     echo >> ${path.module}/kubernetes/be/.env
 fi
 echo 'DATABASE_HOST=${aws_instance.database.public_ip}' >> ${path.module}/kubernetes/be/.env
-echo 'REACT_APP_API_URL=${aws_instance.worker[0].public_ip}' >> ${path.module}/kubernetes/fe/.env
+echo 'REACT_APP_API_URL=${aws_instance.worker[0].public_ip}' > ${path.module}/kubernetes/fe/.env
     EOT
   }
 
   depends_on = [
-    aws_instance.worker
+    aws_instance.worker[0]
   ]
 
 }
