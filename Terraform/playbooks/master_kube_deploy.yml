@@ -1,0 +1,24 @@
+---
+- name: Configuration master
+  hosts: all
+  gather_facts: false
+  become: yes
+  
+  tasks:
+    - name: Execute the Uptime command over Command module
+      register: uptimeoutput
+      command: "uptime"
+
+    - debug:
+        var: uptimeoutput.stdout_lines
+  
+    - name: Executiong kubernetes deployment
+      block:
+        - name: Execute BE kubernetes configuration
+          shell: "cd /home/ubuntu/kubernetes/be && sudo kubectl create configmap be-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml"
+        
+        - name: Execute FE kubernetes configuration
+          shell: "cd /home/ubuntu/kubernetes/fe && sudo kubectl create configmap fe-config --from-env-file=.env && sudo kubectl apply -f deployment.yaml"
+
+    
+        

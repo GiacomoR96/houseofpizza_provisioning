@@ -31,7 +31,7 @@ resource "aws_key_pair" "keypair" {
 resource "aws_instance" "database" {
   ami                     = "ami-0e86e20dae9224db8"
   instance_type           = "t2.medium"
-  vpc_security_group_ids  = [aws_security_group.kubernetes.id]
+  vpc_security_group_ids  = [aws_security_group.database.id]
   key_name                = aws_key_pair.keypair.key_name
   subnet_id               = aws_subnet.private_subnet[0].id
   associate_public_ip_address = true
@@ -318,7 +318,7 @@ resource "aws_lb" "application_lb" {
 
 resource "aws_lb_target_group" "target_group" {
   name        = "${var.cluster_name}-tg"
-  port        = 80
+  port        = 30007
   protocol    = "HTTP"
   vpc_id      = aws_vpc.vpc.id
   target_type = "instance"
@@ -339,7 +339,7 @@ resource "aws_lb_target_group" "target_group" {
 
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.application_lb.arn
-  port              = 80
+  port              = 30007
   protocol          = "HTTP"
 
   default_action {
@@ -352,7 +352,7 @@ resource "aws_lb_target_group_attachment" "ec2_attachment" {
   count            = length(aws_instance.worker.*.id)
   target_group_arn = aws_lb_target_group.target_group.arn
   target_id        = aws_instance.worker.*.id[count.index]
-  port             = 80
+  port             = 30007
 }
 
 resource "null_resource" "resolve_alb_ip" {
@@ -372,3 +372,15 @@ resource "null_resource" "resolve_alb_ip" {
 
 }
 
+// Ansible configuration for starting kubernetes deployments
+resource "null_resource" "ansible_provisioner_master_kubenetes_deployments" {
+  provisioner "local-exec" {
+    command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master_kube_deploy.yml"
+    working_dir = "${path.module}/playbooks"
+  }
+
+  depends_on = [
+    null_resource.resolve_alb_ip
+  ]
+
+}
