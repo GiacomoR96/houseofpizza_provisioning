@@ -12,7 +12,7 @@ variable "subnet_cidrs" {
 
 variable "aws_zones_elb" {
   type = list
-  default = ["us-east-1a", "us-east-1d"]
+  default = ["us-east-1c", "us-east-1d"]
 }
 
 variable "aws_zones_ec2" {
