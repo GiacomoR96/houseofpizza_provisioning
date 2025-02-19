@@ -88,6 +88,12 @@ resource "aws_route_table" "route" {
   }
 }
 
+resource "aws_route_table_association" "route_public" {
+  count           = "${length(var.aws_zones_elb)}"
+  subnet_id       = "${element(aws_subnet.public_subnet.*.id, count.index)}"
+  route_table_id  = aws_route_table.route.id
+}
+
 resource "aws_route_table_association" "route_hybrid" {
   count           = "${length(var.aws_zones_ec2)}"
   subnet_id       = "${element(aws_subnet.hybrid_subnet.*.id, count.index)}"
