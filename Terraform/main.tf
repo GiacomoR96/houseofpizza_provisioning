@@ -339,7 +339,7 @@ resource "aws_lb_target_group" "target_group" {
 
 resource "aws_lb_listener" "http_listener" {
   load_balancer_arn = aws_lb.application_lb.arn
-  port              = 30007
+  port              = 80
   protocol          = "HTTP"
 
   default_action {
@@ -373,7 +373,7 @@ resource "null_resource" "resolve_alb_ip" {
 }
 
 // Ansible configuration for starting kubernetes deployments
-resource "null_resource" "ansible_provisioner_master_kubenetes_deployments" {
+resource "null_resource" "ansible_provisioner_master_kubernetes_deployments" {
   provisioner "local-exec" {
     command = "ansible-playbook --private-key ../.ssh/terraform.pem -i ${aws_instance.master.public_ip}, master_kube_deploy.yml"
     working_dir = "${path.module}/playbooks"
