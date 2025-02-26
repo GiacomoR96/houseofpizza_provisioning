@@ -30,4 +30,4 @@ sudo kubectl exec -it pod_name -- /bin/sh
 
 
 ## Example reference application execution
-# See http://<ip_machine>:4001/houseofpizza/swagger-ui/index.html
+# See http://<ip_machine>:30008/houseofpizza/swagger-ui/index.html
