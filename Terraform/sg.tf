@@ -63,8 +63,8 @@ resource "aws_security_group" "kubernetes" {
 
   ingress {
     description = "Connection BE container"
-    from_port   = 4001
-    to_port     = 4001
+    from_port   = 30008
+    to_port     = 30008
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -74,7 +74,7 @@ resource "aws_security_group" "kubernetes" {
     from_port   = 30007
     to_port     = 30007
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = ["0.0.0.0/0"] # Use ["10.0.0.0/24"] if you want to restrict the range of calls.
   }
 
   #Allow all outbound requests
@@ -105,14 +105,6 @@ resource "aws_security_group" "alb_sg" {
   ingress {
     from_port   = 443
     to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "Connection FE container"
-    from_port   = 30007
-    to_port     = 30007
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
