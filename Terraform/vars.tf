@@ -17,7 +17,7 @@ variable "aws_zones_elb" {
 
 variable "aws_zones_ec2" {
   type = list
-  default = ["us-east-1c"]
+  default = ["us-east-1c", "us-east-1d"]
 }
 
 variable "aws_zones_db" {

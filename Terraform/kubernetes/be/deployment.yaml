@@ -35,4 +35,5 @@ spec:
     - protocol: TCP
       port: 4001  # Port on which the service will be displayed
       targetPort: 4001  # Internal pod port
-  type: LoadBalancer  # Tipe of service (ClusterIP, NodePort, ecc.)
+      nodePort: 30008
+  type: NodePort  # Tipe of service (ClusterIP, NodePort, ecc.)
