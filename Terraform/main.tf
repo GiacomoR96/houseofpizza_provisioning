@@ -172,12 +172,12 @@ resource "aws_iam_instance_profile" "worker_profile" {
 }
 
 resource "aws_instance" "worker" {
-  count = 2  # Change this for using multiple instances of worker.
+  count = "${length(var.aws_zones_ec2)}" # One worker for each AZ, modify this to arrange the workers differently.
 
   ami                    = "ami-0e86e20dae9224db8"
   instance_type          = "t2.medium"
   key_name               = aws_key_pair.keypair.key_name
-  subnet_id              = aws_subnet.hybrid_subnet[0].id
+  subnet_id              = "${element(aws_subnet.hybrid_subnet.*.id, count.index)}"
   iam_instance_profile   = aws_iam_instance_profile.worker_profile.name
   associate_public_ip_address = true
   vpc_security_group_ids  = [aws_security_group.kubernetes.id]

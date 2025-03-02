@@ -74,7 +74,7 @@ resource "aws_security_group" "kubernetes" {
     from_port   = 30007
     to_port     = 30007
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/24"]
+    cidr_blocks = ["0.0.0.0/0"] # Use ["10.0.0.0/24"] if you want to restrict the range of calls.
   }
 
   #Allow all outbound requests
